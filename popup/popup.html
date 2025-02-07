@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart Notes</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Smart Notes</h1>
+            <div class="toolbar">
+                <button id="clearBtn" title="Clear notes">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M2 4h12v1H2zm3 3h6v1H5zm0 3h6v1H5z"/>
+                    </svg>
+                </button>
+                <button id="downloadBtn" title="Download notes">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-6 2h12v1H2z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        
+        <div class="notes-container">
+            <textarea id="notesArea" placeholder="Start taking notes..."></textarea>
+        </div>
+
+        <div class="footer">
+            <div class="status" id="status"></div>
+            <button id="saveBtn" class="primary-btn">Save</button>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>
