@@ -58,6 +58,19 @@ button svg {
 .notes-container {
     flex: 1;
     margin-bottom: 16px;
+    position: relative;
+}
+
+.char-counter {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    font-size: 12px;
+    color: #5f6368;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
 }
 
 #notesArea {

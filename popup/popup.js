@@ -1,3 +1,6 @@
+const CHUNK_SIZE = 8000; // Maximum size per chunk
+const MAX_CHUNKS = 100;   // Limit total chunks to stay within storage quota
+
 function initializePopup() {
     const notesArea = document.getElementById('notesArea');
     const saveBtn = document.getElementById('saveBtn');
@@ -6,39 +9,156 @@ function initializePopup() {
     const status = document.getElementById('status');
 
     // Load saved notes when popup opens
-    chrome.storage.sync.get(['notes'], (result) => {
-        if (result.notes) {
-            notesArea.value = result.notes;
-        }
-    });
+    loadNotes();
 
-    // Save notes
-    function saveNotes() {
+    // Save notes with chunking
+    async function saveNotes() {
         const notes = notesArea.value;
-        chrome.storage.sync.set({ notes }, () => {
+        const chunks = {};
+        
+        // Calculate number of chunks needed
+        const numChunks = Math.ceil(notes.length / CHUNK_SIZE);
+        
+        if (numChunks > MAX_CHUNKS) {
+            updateStatus('Warning: Notes too long! Please reduce the size.');
+            return;
+        }
+
+        // Store metadata
+        chunks.metadata = {
+            totalChunks: numChunks,
+            totalLength: notes.length,
+            lastModified: new Date().toISOString()
+        };
+
+        // Split notes into chunks
+        for (let i = 0; i < numChunks; i++) {
+            const start = i * CHUNK_SIZE;
+            const end = start + CHUNK_SIZE;
+            chunks[`chunk_${i}`] = notes.slice(start, end);
+        }
+
+        try {
+            await new Promise((resolve, reject) => {
+                chrome.storage.sync.set(chunks, () => {
+                    if (chrome.runtime.lastError) {
+                        reject(chrome.runtime.lastError);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
             updateStatus('Notes saved!');
-        });
+        } catch (error) {
+            console.error('Error saving notes:', error);
+            updateStatus('Error saving notes!');
+        }
     }
 
     saveBtn.addEventListener('click', saveNotes);
 
-    // Auto-save on typing (debounced)
+    // Update character count and auto-save on typing
     let saveTimeout;
+    const charCounter = document.getElementById('charCounter');
+    const MAX_CHARS = CHUNK_SIZE * MAX_CHUNKS;
+
+    function updateCharCount() {
+        const count = notesArea.value.length;
+        const formattedCount = count.toLocaleString();
+        const formattedMax = MAX_CHARS.toLocaleString();
+        charCounter.textContent = `${formattedCount} / ${formattedMax} characters`;
+        
+        // Update counter color based on length
+        if (count > MAX_CHARS) {
+            charCounter.style.color = '#d93025';
+        } else if (count > MAX_CHARS * 0.9) {
+            charCounter.style.color = 'rgb(227, 116, 0)';
+        } else {
+            charCounter.style.color = 'rgb(95, 99, 104)';
+        }
+    }
+
+    // Export for testing
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { updateCharCount };
+    }
+
     notesArea.addEventListener('input', () => {
+        updateCharCount();
         clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => {
-            const notes = notesArea.value;
-            chrome.storage.sync.set({ notes }, () => {});
-        }, 1000);
+        saveTimeout = setTimeout(saveNotes, 1000);
     });
 
+    // Initial character count
+    updateCharCount();
+
+    // Load notes from chunks
+    async function loadNotes() {
+        try {
+            // First get metadata
+            const data = await new Promise((resolve) => {
+                chrome.storage.sync.get('metadata', resolve);
+            });
+
+            if (!data.metadata) {
+                // No chunks found, try loading legacy format
+                const legacy = await new Promise((resolve) => {
+                    chrome.storage.sync.get(['notes'], resolve);
+                });
+                if (legacy && legacy.notes) {
+                    notesArea.value = legacy.notes;
+                    updateCharCount(); // Update character count after loading
+                }
+                return;
+            }
+
+            const { totalChunks } = data.metadata;
+            let fullText = '';
+
+            // Get all chunks
+            const chunkKeys = Array.from({ length: totalChunks }, (_, i) => `chunk_${i}`);
+            const chunks = await new Promise((resolve) => {
+                chrome.storage.sync.get(chunkKeys, resolve);
+            });
+
+            // Reconstruct the text in order
+            for (let i = 0; i < totalChunks; i++) {
+                fullText += chunks[`chunk_${i}`] || '';
+            }
+
+            notesArea.value = fullText;
+        } catch (error) {
+            console.error('Error loading notes:', error);
+            updateStatus('Error loading notes!');
+        }
+    }
+
     // Clear notes
-    clearBtn.addEventListener('click', () => {
+    clearBtn.addEventListener('click', async () => {
         if (window.confirm('Are you sure you want to clear all notes?')) {
             notesArea.value = '';
-            chrome.storage.sync.remove('notes', () => {
+            try {
+                // Get metadata to know how many chunks to remove
+                const data = await new Promise((resolve) => {
+                    chrome.storage.sync.get('metadata', resolve);
+                });
+                if (data.metadata) {
+                    const { totalChunks } = data.metadata;
+                    const keysToRemove = ['metadata', ...Array.from({ length: totalChunks }, (_, i) => `chunk_${i}`)];
+                    await new Promise((resolve) => {
+                        chrome.storage.sync.remove(keysToRemove, resolve);
+                    });
+                } else {
+                    // Try removing legacy format
+                    await new Promise((resolve) => {
+                        chrome.storage.sync.remove('notes', resolve);
+                    });
+                }
                 updateStatus('Notes cleared');
-            });
+            } catch (error) {
+                console.error('Error clearing notes:', error);
+                updateStatus('Error clearing notes!');
+            }
         }
     });
 
