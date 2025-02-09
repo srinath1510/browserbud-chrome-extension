@@ -4,9 +4,13 @@
   "version": "1.0",
   "description": "An intelligent note-taking extension",
   "permissions": [
-    "storage"
+    "storage",
+    "contextMenus"
   ],
   "action": {
     "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }

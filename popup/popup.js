@@ -200,5 +200,24 @@ function initializePopup() {
     });
 }
 
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', initializePopup);
+// Load and display saved notes in the notepad
+function loadNotesList() {
+    const storageKey = 'notes';
+    chrome.storage.sync.get([storageKey], (result) => {
+        const notes = result[storageKey] || [];
+        const notesList = document.getElementById('notesList');
+        notesList.innerHTML = ''; 
+
+        notes.forEach(note => {
+            const listItem = document.createElement('li');
+            listItem.textContent = note.content; 
+            notesList.appendChild(listItem);
+        });
+    });
+}
+
+// Call loadNotes when the popup is opened
+document.addEventListener('DOMContentLoaded', () => {
+    initializePopup();
+    loadNotesList();
+});

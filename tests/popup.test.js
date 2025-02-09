@@ -37,7 +37,9 @@ describe('Popup Functionality', () => {
 
     test('loads saved notes on startup', async () => {
         // Setup test data
-        global.__chromeStorageData = { notes: 'test notes' };
+        global.chrome.storage.sync.get.mockImplementation((keys, callback) => {
+            callback({ notes: [{ content: 'test notes' }] }); // Return an array of note objects
+        });
 
         // Re-initialize to trigger load
         document.dispatchEvent(new Event('DOMContentLoaded'));
@@ -46,7 +48,16 @@ describe('Popup Functionality', () => {
         await new Promise(resolve => setTimeout(resolve, 0));
 
         // Verify
-        expect(notesArea.value).toBe('test notes');
+        const notesList = document.getElementById('notesList');
+        const listItems = notesList.getElementsByTagName('li');
+        console.log('Number of list items:', listItems.length);
+        if (listItems.length > 0) {
+            console.log('First list item content:', listItems[0].textContent);
+        } else {
+            console.log('No list items found.');
+        }
+        expect(listItems.length).toBe(1); 
+        expect(listItems[0].textContent).toBe('test notes');
     });
 
     test('saves notes when save button is clicked', async () => {
@@ -251,4 +262,3 @@ describe('Popup Functionality', () => {
         expect(chrome.storage.sync.set).toHaveBeenCalled();
     });
 });
-

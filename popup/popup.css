@@ -56,7 +56,7 @@ button svg {
 }
 
 .notes-container {
-    flex: 1;
+    flex: 0 0 auto; /* Prevent the notes area from growing */
     margin-bottom: 16px;
     position: relative;
 }
@@ -75,7 +75,7 @@ button svg {
 
 #notesArea {
     width: 100%;
-    height: 100%;
+    height: 150px;
     padding: 12px;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
@@ -111,4 +111,12 @@ button svg {
 
 .primary-btn:hover {
     background-color: #1557b0;
+}
+
+.scrollable-notes {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 5px;
+    background-color: #f9f9f9;
 }
