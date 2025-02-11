@@ -106,7 +106,7 @@ function initializePopup() {
                     chrome.storage.sync.get(['notes'], resolve);
                 });
                 if (legacy && legacy.notes) {
-                    notesArea.value = legacy.notes;
+                    notesArea.value = legacy.notes.map(note => note.content).join('\n'); 
                     updateCharCount(); // Update character count after loading
                 }
                 return;
