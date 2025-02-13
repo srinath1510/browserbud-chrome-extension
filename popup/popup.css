@@ -120,3 +120,12 @@ button svg {
     padding: 5px;
     background-color: #f9f9f9;
 }
+
+.note-type {
+    background-color: #e0e0e0; /* Light gray background */
+    color: #333; /* Dark text color */
+    border-radius: 3px; /* Rounded corners */
+    padding: 2px 5px; /* Padding for spacing */
+    margin-left: 10px; /* Space between note content and tag */
+    font-size: 0.9em; /* Slightly smaller font size */
+}

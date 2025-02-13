@@ -9,23 +9,21 @@ const onInstalled = () => {
 
 const onClicked = (info, tab) => {
     console.log('Context menu item clicked:', info);
-    let noteContent = '';
-    let noteType = '';
-
-    if (info.selectionText) {
-        noteContent = info.selectionText;
-        noteType = 'selection';
+    
+    if (!info.selectionText) {
+        console.log('No text selected, skipping save.');
+        return;  // Prevent saving empty notes
     }
 
-    console.log('Note content:', noteContent);
     const note = {
-        content: noteContent,
-        type: noteType,
+        content: info.selectionText,
+        type: 'selection',
         source: {
             url: tab.url,
             title: tab.title,
             timestamp: new Date().toISOString()
-        }
+        },
+        tag: 'Context Menu'
     };
 
     console.log('Saving Note:', note);
@@ -36,6 +34,11 @@ function saveNoteToStorage(note) {
     const storageKey = 'notes';
     chrome.storage.sync.get([storageKey], (result) => {
         const notes = result[storageKey] || [];
+        if (note.type === 'selection') {
+            note.tag = 'Context Menu'; 
+        } else {
+            note.tag = 'Manual Entry'; 
+        }
         notes.push(note);
         chrome.storage.sync.set({ [storageKey]: notes }, () => {
             console.log('Note saved successfully!');
