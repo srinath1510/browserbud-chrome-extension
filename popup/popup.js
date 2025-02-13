@@ -18,8 +18,6 @@ function initializePopup() {
                 updateStatus('No notes to save.');
                 return;
             }
-            console.log('Saving notes:', notes); // Debugging line
-
         
             const result = await new Promise((resolve) => {
                 chrome.storage.sync.get(['notes'], (result) => {
@@ -32,7 +30,6 @@ function initializePopup() {
             });
             const existingNotes = result.notes || [];
     
-            // Create a unique note object
             const note = {
                 id: `note_${Date.now()}`, // unique id for the note
                 content: notes,
@@ -44,12 +41,10 @@ function initializePopup() {
                 }
             };
     
-            // Add the note only if it doesn't already exist
             if (!existingNotes.some(existingNote => existingNote.content === notes)) {
                 existingNotes.push(note);
             }
     
-            // Save notes
             await new Promise((resolve, reject) => {
                 chrome.storage.sync.set({ notes: existingNotes }, () => {
                     if (chrome.runtime.lastError) {
@@ -84,7 +79,6 @@ function initializePopup() {
         const formattedMax = MAX_CHARS.toLocaleString();
         charCounter.textContent = `${formattedCount} / ${formattedMax} characters`;
         
-        // Update counter color based on length
         if (count > MAX_CHARS) {
             charCounter.style.color = '#d93025';
         } else if (count > MAX_CHARS * 0.9) {
@@ -94,7 +88,6 @@ function initializePopup() {
         }
     }
 
-    // Export for testing
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = { updateCharCount };
     }
@@ -105,39 +98,31 @@ function initializePopup() {
         saveTimeout = setTimeout(saveNotes, 10000);
     });
 
-    // Initial character count
     updateCharCount();
 
-    // Load notes from chunks
     async function loadNotes() {
-        // Clear the notesArea to ensure it starts empty
         notesArea.value = '';
 
         try {
-            // Retrieve saved notes from storage
             const result = await new Promise((resolve) => {
                 chrome.storage.sync.get(['notes'], resolve);
             });
 
             const savedNotes = result.notes || [];
 
-            // Clear the Saved Notes section if there are no saved notes
             if (savedNotes.length === 0) {
-                // Optionally, you can clear the displayed notes list if needed
-                return; // Exit if there are no notes to load
+                return; 
             }
 
-            // Display saved notes in the Saved Notes section
             const notesList = document.getElementById('notesList');
-            notesList.innerHTML = ''; // Clear the existing list
+            notesList.innerHTML = '';
 
             savedNotes.forEach(note => {
                 const listItem = document.createElement('li');
-                listItem.textContent = note.content; // Display only the note content
+                listItem.textContent = note.content;
                 notesList.appendChild(listItem);
             });
 
-            // Update character count after loading
             updateCharCount();
         } catch (error) {
             console.error('Error loading notes:', error);
@@ -145,18 +130,16 @@ function initializePopup() {
         }
     }
 
-    // Clear notes
     clearBtn.addEventListener('click', async () => {
         if (window.confirm('Are you sure you want to clear all notes?')) {
             notesArea.value = ''; // Clear the notes area
             try {
-                // Clear saved notes from storage
                 await new Promise((resolve) => {
-                    chrome.storage.sync.remove('notes', resolve); // Clear all saved notes
+                    chrome.storage.sync.remove('notes', resolve); 
                 });
                 updateStatus('All notes cleared');
-                loadNotesList(); // Refresh the displayed notes
-                updateCharCount(); // Reset character counter to 0
+                loadNotesList();
+                updateCharCount();
             } catch (error) {
                 console.error('Error clearing notes:', error);
                 updateStatus('Error clearing notes!');
@@ -195,7 +178,6 @@ function initializePopup() {
     }
 });
 
-    // Update status message with auto-clear
     function updateStatus(message) {
         status.textContent = message;
         setTimeout(() => {
@@ -203,18 +185,15 @@ function initializePopup() {
         }, 2000);
     }
 
-    // Handle keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         // Ctrl/Cmd + S to save
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-            console.log('Save shortcut triggered'); // Debugging line
             e.preventDefault();
             saveNotes();
         }
     });
 }
 
-// Load and display saved notes in the notepad
 function loadNotesList() {
     const storageKey = 'notes';
     chrome.storage.sync.get([storageKey], (result) => {
@@ -234,7 +213,6 @@ function loadNotesList() {
     });
 }
 
-// Call loadNotes when the popup is opened
 document.addEventListener('DOMContentLoaded', () => {
     initializePopup();
     loadNotesList();
