@@ -12,7 +12,7 @@ const onClicked = (info, tab) => {
     
     if (!info.selectionText) {
         console.log('No text selected, skipping save.');
-        return;  // Prevent saving empty notes
+        return;
     }
 
     const note = {
@@ -46,16 +46,11 @@ function saveNoteToStorage(note) {
     });
 }
 
-// Determine if we're in a test environment
 const isTestEnvironment = typeof jest !== 'undefined';
-
-// Add event listeners only if not in test environment
 if (!isTestEnvironment) {
     chrome.runtime.onInstalled.addListener(onInstalled);
     chrome.contextMenus.onClicked.addListener(onClicked);
 }
-
-// Export for testing
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         onInstalled,
