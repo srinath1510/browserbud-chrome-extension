@@ -1,6 +1,6 @@
 # Smart Notes Chrome Extension
 
-A Chrome extension that assists users take notes while browsing.
+A Chrome extension that assists users with taking notes while browsing the web.
 
 ## Features
 
