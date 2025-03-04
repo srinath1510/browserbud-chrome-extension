@@ -7,8 +7,67 @@ function initializePopup() {
     const clearBtn = document.getElementById('clearBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const status = document.getElementById('status');
+    const bakeBtn = document.getElementById('bakeBtn');
+    const contextDepthSelect = document.getElementById('contextDepth')
+    const useLocalLLMCheckbox = document.getElementById('useLocalLLM');
+    const localLLMUrlInput = document.getElementById('localLLMUrl');
 
-    // Load saved notes when popup opens
+    let userPreferences = {
+        contextDepth: 'medium',
+        useLocalLLM: false,
+        localLLMUrl: 'http://localhost:11434/api/generate',
+        includeTableOfContents: true
+    };
+
+    chrome.storage.sync.get(['userPreferences'], (result) => {
+        if (result.userPreferences) {
+            userPreferences = result.userPreferences;
+            
+            if (contextDepthSelect) contextDepthSelect.value = userPreferences.contextDepth;
+            if (useLocalLLMCheckbox) useLocalLLMCheckbox.checked = userPreferences.useLocalLLM;
+            if (localLLMUrlInput) localLLMUrlInput.value = userPreferences.localLLMUrl;
+            if (document.getElementById('includeTOC')) {
+                document.getElementById('includeTOC').checked = userPreferences.includeTableOfContents;
+            }
+            
+            toggleLocalLLMUrlVisibility();
+        }
+    });
+
+    function savePreferences() {
+        userPreferences.contextDepth = contextDepthSelect ? contextDepthSelect.value : 'medium';
+        userPreferences.useLocalLLM = useLocalLLMCheckbox ? useLocalLLMCheckbox.checked : false;
+        userPreferences.localLLMUrl = localLLMUrlInput ? localLLMUrlInput.value : 'http://localhost:11434/api/generate';
+        userPreferences.includeTableOfContents = document.getElementById('includeTOC') ? 
+            document.getElementById('includeTOC').checked : true;
+            
+        chrome.storage.sync.set({ userPreferences }, () => {
+            console.log('Preferences saved');
+        });
+    }
+
+    function toggleLocalLLMUrlVisibility() {
+        if (localLLMUrlInput && useLocalLLMCheckbox) {
+            const container = document.getElementById('localLLMUrlContainer');
+            if (container) {
+                container.style.display = useLocalLLMCheckbox.checked ? 'block' : 'none';
+            }
+        }
+    }
+
+    if (contextDepthSelect) contextDepthSelect.addEventListener('change', savePreferences);
+    if (useLocalLLMCheckbox) {
+        useLocalLLMCheckbox.addEventListener('change', () => {
+            toggleLocalLLMUrlVisibility();
+            savePreferences();
+        });
+    }
+    if (localLLMUrlInput) localLLMUrlInput.addEventListener('change', savePreferences);
+    if (document.getElementById('includeTOC')) {
+        document.getElementById('includeTOC').addEventListener('change', savePreferences);
+    }
+
+
     loadNotes();
 
     async function saveNotes() {
@@ -31,7 +90,7 @@ function initializePopup() {
             const existingNotes = result.notes || [];
     
             const note = {
-                id: `note_${Date.now()}`, // unique id for the note
+                id: `note_${Date.now()}`,
                 content: notes,
                 type: 'manual',
                 source: {
@@ -67,6 +126,66 @@ function initializePopup() {
     }
 
     saveBtn.addEventListener('click', saveNotes);
+
+    async function bakeNotes() {
+        updateStatus('Processing notes with LLM...');
+        
+        try {
+            const result = await new Promise((resolve) => {
+                chrome.storage.sync.get(['notes'], resolve);
+            });
+            
+            const notes = result.notes || [];
+            
+            if (notes.length === 0) {
+                updateStatus('No notes to process');
+                return;
+            }
+            
+            const loadingElement = document.createElement('div');
+            loadingElement.id = 'loadingIndicator';
+            loadingElement.innerHTML = '<div class="spinner"></div><p>Generating enhanced notes...</p>';
+            document.body.appendChild(loadingElement);
+            
+            chrome.runtime.sendMessage({
+                action: 'bakeNotes',
+                notes: notes,
+                preferences: userPreferences
+            }, response => {
+                document.body.removeChild(loadingElement);
+                
+                if (response.success) {
+                    const structuredNotes = response.data.structured_notes;
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    
+                    const blob = new Blob([structuredNotes], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `obsidian-notes-${timestamp}.md`;
+                    a.click();
+                    
+                    URL.revokeObjectURL(url);
+                    updateStatus('Enhanced notes created successfully!');
+                } else {
+                    updateStatus(`Error: ${response.error || 'Failed to process notes'}`);
+                }
+            });
+        } catch (error) {
+            console.error('Error during notes baking:', error);
+            updateStatus('Error processing notes!');
+            
+            const loadingElement = document.getElementById('loadingIndicator');
+            if (loadingElement) {
+                document.body.removeChild(loadingElement);
+            }
+        }
+    }
+
+    if (bakeBtn) {
+        bakeBtn.addEventListener('click', bakeNotes);
+    }
 
     // Update character count and auto-save on typing
     let saveTimeout;

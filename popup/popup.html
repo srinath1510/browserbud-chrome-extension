@@ -21,6 +21,41 @@
                 </button>
             </div>
         </div>
+        <div class="button-container">
+            <button id="bakeBtn" class="action-button">Bake Notes</button>
+          </div>
+          
+          <div class="preferences-section">
+            <h3>LLM Settings</h3>
+            
+            <div class="preference-item">
+              <label for="contextDepth">Context Depth:</label>
+              <select id="contextDepth">
+                <option value="minimal">Minimal - Basic Organization</option>
+                <option value="medium" selected>Medium - Added Context</option>
+                <option value="maximum">Maximum - Detailed Explanations</option>
+              </select>
+            </div>
+            
+            <div class="preference-item">
+              <label>
+                <input type="checkbox" id="includeTOC" checked>
+                Include Table of Contents
+              </label>
+            </div>
+            
+            <div class="preference-item">
+              <label>
+                <input type="checkbox" id="useLocalLLM">
+                Use Local LLM
+              </label>
+            </div>
+            
+            <div class="preference-item" id="localLLMUrlContainer" style="display: none;">
+              <label for="localLLMUrl">Local LLM URL:</label>
+              <input type="text" id="localLLMUrl" value="http://localhost:11434/api/generate">
+            </div>
+          </div>
         
         <div class="notes-container">
             <textarea id="notesArea" placeholder="Start taking notes..."></textarea>

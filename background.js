@@ -6,7 +6,6 @@ const onInstalled = () => {
         contexts: ["selection"]
     });
 };
-
 const onClicked = (info, tab) => {
     console.log('Context menu item clicked:', info);
     
@@ -29,7 +28,6 @@ const onClicked = (info, tab) => {
     console.log('Saving Note:', note);
     saveNoteToStorage(note);
 };
-
 function saveNoteToStorage(note) {
     const storageKey = 'notes';
     chrome.storage.sync.get([storageKey], (result) => {
@@ -45,7 +43,45 @@ function saveNoteToStorage(note) {
         });
     });
 }
-
+async function processNotesWithLLM(notes, preferences) {
+    try {
+        const apiUrl = preferences.useLocalLLM ? 
+            preferences.localLLMUrl : 
+            'https://your-backend-api.com/process-notes';
+            
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                notes: notes,
+                preferences: preferences
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API responded with status: ${response.status}`);
+        }
+        
+        return await response.json();
+    } catch (error) {
+        console.error('Error processing notes with LLM:', error);
+        throw error;
+    }
+}
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'bakeNotes') {
+        processNotesWithLLM(request.notes, request.preferences)
+            .then(result => {
+                sendResponse({success: true, data: result});
+            })
+            .catch(error => {
+                sendResponse({success: false, error: error.message});
+            });
+        return true;
+    }
+});
 const isTestEnvironment = typeof jest !== 'undefined';
 if (!isTestEnvironment) {
     chrome.runtime.onInstalled.addListener(onInstalled);
@@ -55,6 +91,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         onInstalled,
         onClicked,
-        saveNoteToStorage
+        saveNoteToStorage,
+        processNotesWithLLM
     };
 }
