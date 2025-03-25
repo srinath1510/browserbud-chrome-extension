@@ -7,6 +7,61 @@ const onInstalled = () => {
     });
 };
 
+const extractPageMetadata = (tab) => {
+    return new Promise((resolve, reject) => {
+        try {
+            chrome.tabs.executeScript(tab.id, {
+                code: `
+                (() => {
+                    return {
+                        // Page-Level Metadata
+                        url: window.location.href,
+                        title: document.title,
+                        domain: window.location.hostname,
+                        language: document.documentElement.lang || navigator.language,
+                        contentType: document.contentType,
+                        pageLoadTimestamp: new Date().toISOString(),
+
+                        // Content-Specific Metadata
+                        wordCount: window.getSelection().toString().trim().split(/\\s+/).length,
+                        textPosition: (() => {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const range = selection.getRangeAt(0);
+                                const preCaretRange = range.cloneRange();
+                                preCaretRange.selectNodeContents(document.body);
+                                preCaretRange.setEnd(range.startContainer, range.startOffset);
+                                return preCaretRange.toString().length;
+                            }
+                            return 0;
+                        })(),
+                        associatedTags: (() => {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                const parentElement = selection.getRangeAt(0).startContainer.parentElement;
+                                return parentElement ? parentElement.tagName : 'UNKNOWN';
+                            }
+                            return 'UNKNOWN';
+                        })(),
+                        linkCount: document.links.length,
+                        hasCode: document.querySelector('pre, code') !== null,
+                        hasMathFormula: document.querySelector('math, .math') !== null
+                    };
+                })()
+                `
+            }, (result) => {
+                if (chrome.runtime.lastError) {
+                    reject(chrome.runtime.lastError);
+                } else {
+                    resolve(result[0] || {});
+                }
+            });
+        } catch (error) {
+            reject(error);
+        }
+    });
+};
+
 const onClicked = (info, tab) => {
     console.log('Context menu item clicked:', info);
     
@@ -15,19 +70,74 @@ const onClicked = (info, tab) => {
         return;
     }
 
-    const note = {
-        content: info.selectionText,
-        type: 'selection',
-        source: {
-            url: tab.url,
-            title: tab.title,
-            timestamp: new Date().toISOString()
-        },
-        tag: 'Context Menu'
-    };
+    extractPageMetadata(tab)
+    .then(pageMetadata => {
+        const note = {
+            // Core note content
+            content: info.selectionText,
+            type: 'selection',
+            
+            // Source information
+            source: {
+                url: tab.url,
+                title: tab.title,
+                timestamp: new Date().toISOString()
+            },
+            
+            // Enriched Metadata
+            metadata: {
+                // Page-Level Metadata
+                pageUrl: pageMetadata.url,
+                pageTitle: pageMetadata.title,
+                domain: pageMetadata.domain,
+                pageLanguage: pageMetadata.language,
+                contentType: pageMetadata.contentType,
+                pageLoadTimestamp: pageMetadata.pageLoadTimestamp,
 
-    console.log('Saving Note:', note);
-    saveNoteToStorage(note);
+                // Content-Specific Metadata
+                wordCount: pageMetadata.wordCount,
+                textPosition: pageMetadata.textPosition,
+                associatedTags: pageMetadata.associatedTags,
+                linkCount: pageMetadata.linkCount,
+                hasCode: pageMetadata.hasCode,
+                hasMathFormula: pageMetadata.hasMathFormula,
+
+                // User Interaction Metadata
+                userTags: [], // Placeholder for user-added tags
+                annotationTimestamp: new Date().toISOString(),
+                
+                // Additional context
+                selectionLength: info.selectionText.length,
+                intent: 'contextMenuCapture'
+            },
+
+            // Tagging
+            tag: 'Context Menu'
+        };
+
+        console.log('Saving Enhanced Note:', note);
+        saveNoteToStorage(note);
+    })
+    .catch(error => {
+        console.error('Error extracting page metadata:', error);
+        
+        // Fallback note creation without metadata
+        const note = {
+            content: info.selectionText,
+            type: 'selection',
+            source: {
+                url: tab.url,
+                title: tab.title,
+                timestamp: new Date().toISOString()
+            },
+            tag: 'Context Menu',
+            metadata: {
+                error: 'Metadata extraction failed'
+            }
+        };
+
+        saveNoteToStorage(note);
+    });
 };
 
 function saveNoteToStorage(note) {
@@ -55,6 +165,7 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         onInstalled,
         onClicked,
-        saveNoteToStorage
+        saveNoteToStorage,
+        extractPageMetadata
     };
 }
