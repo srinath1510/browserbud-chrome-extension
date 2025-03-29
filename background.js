@@ -10,9 +10,9 @@ const onInstalled = () => {
 const extractPageMetadata = (tab) => {
     return new Promise((resolve, reject) => {
         try {
-            chrome.tabs.executeScript(tab.id, {
-                code: `
-                (() => {
+            chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                function: () => {
                     return {
                         // Page-Level Metadata
                         url: window.location.href,
@@ -21,9 +21,8 @@ const extractPageMetadata = (tab) => {
                         language: document.documentElement.lang || navigator.language,
                         contentType: document.contentType,
                         pageLoadTimestamp: new Date().toISOString(),
-
                         // Content-Specific Metadata
-                        wordCount: window.getSelection().toString().trim().split(/\\s+/).length,
+                        wordCount: window.getSelection().toString().trim().split(/\s+/).length,
                         textPosition: (() => {
                             const selection = window.getSelection();
                             if (selection.rangeCount > 0) {
@@ -47,8 +46,7 @@ const extractPageMetadata = (tab) => {
                         hasCode: document.querySelector('pre, code') !== null,
                         hasMathFormula: document.querySelector('math, .math') !== null
                     };
-                })()
-                `
+                }
             }, (result) => {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
@@ -73,18 +71,15 @@ const onClicked = (info, tab) => {
     extractPageMetadata(tab)
     .then(pageMetadata => {
         const note = {
-            // Core note content
             content: info.selectionText,
             type: 'selection',
             
-            // Source information
             source: {
                 url: tab.url,
                 title: tab.title,
                 timestamp: new Date().toISOString()
             },
             
-            // Enriched Metadata
             metadata: {
                 // Page-Level Metadata
                 pageUrl: pageMetadata.url,
@@ -102,16 +97,11 @@ const onClicked = (info, tab) => {
                 hasCode: pageMetadata.hasCode,
                 hasMathFormula: pageMetadata.hasMathFormula,
 
-                // User Interaction Metadata
-                userTags: [], // Placeholder for user-added tags
                 annotationTimestamp: new Date().toISOString(),
-                
-                // Additional context
+
                 selectionLength: info.selectionText.length,
                 intent: 'contextMenuCapture'
             },
-
-            // Tagging
             tag: 'Context Menu'
         };
 
@@ -169,3 +159,4 @@ if (typeof module !== 'undefined' && module.exports) {
         extractPageMetadata
     };
 }
+

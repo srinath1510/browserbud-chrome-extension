@@ -38,6 +38,10 @@ function initializePopup() {
                     url: '',
                     title: '',
                     timestamp: new Date().toISOString()
+                },
+                metadata: {
+                    wordCount: notes.trim().split(/\s+/).length,
+                    annotationTimestamp: new Date().toISOString()
                 }
             };
     
@@ -203,10 +207,28 @@ function loadNotesList() {
 
         notes.forEach(note => {
             const listItem = document.createElement('li');
-            listItem.textContent = note.content; 
+
+            const contentSpan = document.createElement('span');
+            contentSpan.textContent = note.content;
+            listItem.appendChild(contentSpan);
+
+            if (note.metadata) {
+                const metadataDiv = document.createElement('div');
+                metadataDiv.className = 'note-metadata';
+
+                const metadataDetails = [
+                    note.metadata.pageTitle && `Source: ${note.metadata.pageTitle}`,
+                    note.metadata.domain && `Domain: ${note.metadata.domain}`,
+                    `Captured: ${new Date(note.source.timestamp).toLocaleString()}`,
+                    note.metadata.wordCount && `Words: ${note.metadata.wordCount}`
+                ].filter(Boolean).join(' | ');
+                metadataDiv.textContent = metadataDetails;
+                listItem.appendChild(metadataDiv);
+            }
+
             const type = document.createElement('span');
             type.textContent = ` (${note.type})`; 
-            type.className = 'note-type'; 
+            type.className = 'note-type';   
             listItem.appendChild(type);
             notesList.appendChild(listItem);
         });
