@@ -13,7 +13,7 @@ const extractPageMetadata = (tab) => {
             chrome.scripting.executeScript({
                 target: { tabId: tab.id },
                 function: () => {
-                    return {
+                    const metadata = {
                         // Page-Level Metadata
                         url: window.location.href,
                         title: document.title,
@@ -46,12 +46,17 @@ const extractPageMetadata = (tab) => {
                         hasCode: document.querySelector('pre, code') !== null,
                         hasMathFormula: document.querySelector('math, .math') !== null
                     };
+                    console.log('Extracted Page Metadata:', metadata);
+                    return metadata;
                 }
             }, (result) => {
                 if (chrome.runtime.lastError) {
                     reject(chrome.runtime.lastError);
                 } else {
-                    resolve(result[0] || {});
+                    console.log('Raw executeScript result:', result);
+                    const pageMetadata = result && result.length > 0 && result[0].result ? result[0].result : {};
+                    console.log('Processed metadata:', pageMetadata);
+                    resolve(pageMetadata);
                 }
             });
         } catch (error) {
@@ -70,6 +75,26 @@ const onClicked = (info, tab) => {
 
     extractPageMetadata(tab)
     .then(pageMetadata => {
+        const metadata = {
+            pageUrl: pageMetadata.url || tab.url,
+            pageTitle: pageMetadata.title || tab.title,
+            domain: pageMetadata.domain || new URL(tab.url).hostname,
+            pageLanguage: pageMetadata.language || 'unknown',
+            contentType: pageMetadata.contentType || 'unknown',
+            pageLoadTimestamp: pageMetadata.pageLoadTimestamp || new Date().toISOString(),
+
+            wordCount: pageMetadata.wordCount || info.selectionText.trim().split(/\s+/).length,
+            textPosition: pageMetadata.textPosition || 0,
+            associatedTags: pageMetadata.associatedTags || 'UNKNOWN',
+            linkCount: pageMetadata.linkCount || 0,
+            hasCode: pageMetadata.hasCode || false,
+            hasMathFormula: pageMetadata.hasMathFormula || false,
+
+            annotationTimestamp: new Date().toISOString(),
+            selectionLength: info.selectionText.length,
+            intent: 'contextMenuCapture'
+        };
+
         const note = {
             content: info.selectionText,
             type: 'selection',
@@ -80,28 +105,7 @@ const onClicked = (info, tab) => {
                 timestamp: new Date().toISOString()
             },
             
-            metadata: {
-                // Page-Level Metadata
-                pageUrl: pageMetadata.url,
-                pageTitle: pageMetadata.title,
-                domain: pageMetadata.domain,
-                pageLanguage: pageMetadata.language,
-                contentType: pageMetadata.contentType,
-                pageLoadTimestamp: pageMetadata.pageLoadTimestamp,
-
-                // Content-Specific Metadata
-                wordCount: pageMetadata.wordCount,
-                textPosition: pageMetadata.textPosition,
-                associatedTags: pageMetadata.associatedTags,
-                linkCount: pageMetadata.linkCount,
-                hasCode: pageMetadata.hasCode,
-                hasMathFormula: pageMetadata.hasMathFormula,
-
-                annotationTimestamp: new Date().toISOString(),
-
-                selectionLength: info.selectionText.length,
-                intent: 'contextMenuCapture'
-            },
+            metadata: metadata,
             tag: 'Context Menu'
         };
 
@@ -122,7 +126,11 @@ const onClicked = (info, tab) => {
             },
             tag: 'Context Menu',
             metadata: {
-                error: 'Metadata extraction failed'
+                error: 'Metadata extraction failed',
+                annotationTimestamp: new Date().toISOString(),
+                selectionLength: info.selectionText.length,
+                intent: 'contextMenuCapture',
+                wordCount: info.selectionText.trim().split(/\s+/).length
             }
         };
 
