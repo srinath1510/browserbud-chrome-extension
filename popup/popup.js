@@ -20,7 +20,7 @@ function initializePopup() {
             }
         
             const result = await new Promise((resolve) => {
-                chrome.storage.sync.get(['notes'], (result) => {
+                chrome.storage.sync.get(null, (result) => {
                     if (chrome.runtime.lastError) {
                         console.error('Error retrieving notes:', chrome.runtime.lastError);
                         return;
@@ -28,10 +28,9 @@ function initializePopup() {
                     resolve(result);
                 });
             });
-            const existingNotes = result.notes || [];
     
             const note = {
-                id: `note_${Date.now()}`, // unique id for the note
+                id: `note_${Date.now()}`,
                 content: notes,
                 type: 'manual',
                 source: {
@@ -45,12 +44,18 @@ function initializePopup() {
                 }
             };
     
-            if (!existingNotes.some(existingNote => existingNote.content === notes)) {
-                existingNotes.push(note);
-            }
+            const existingNotes = Object.keys(result)
+            .filter(key => key.startsWith('note_'))
+            .map(key => result[key]);
+            existingNotes.push(note);
     
             await new Promise((resolve, reject) => {
-                chrome.storage.sync.set({ notes: existingNotes }, () => {
+                const notesToSave = {};
+                existingNotes.forEach(existingNote => {
+                    notesToSave[existingNote.id] = existingNote;
+                });
+
+                chrome.storage.sync.set(notesToSave, () => {
                     if (chrome.runtime.lastError) {
                         console.error('Error saving notes:', chrome.runtime.lastError);
                         reject(chrome.runtime.lastError);
@@ -109,19 +114,21 @@ function initializePopup() {
 
         try {
             const result = await new Promise((resolve) => {
-                chrome.storage.sync.get(['notes'], resolve);
+                chrome.storage.sync.get(null, resolve);
             });
 
-            const savedNotes = result.notes || [];
+            const notes = Object.keys(result)
+            .filter(key => key.startsWith('note_'))
+            .map(key => result[key]);
 
-            if (savedNotes.length === 0) {
+            if (notes.length === 0) {
                 return; 
             }
 
             const notesList = document.getElementById('notesList');
             notesList.innerHTML = '';
 
-            savedNotes.forEach(note => {
+            notes.forEach(note => {
                 const listItem = document.createElement('li');
                 listItem.textContent = note.content;
                 notesList.appendChild(listItem);
@@ -138,8 +145,11 @@ function initializePopup() {
         if (window.confirm('Are you sure you want to clear all notes?')) {
             notesArea.value = ''; // Clear the notes area
             try {
-                await new Promise((resolve) => {
-                    chrome.storage.sync.remove('notes', resolve); 
+                const result = await new Promise((resolve) => {
+                    chrome.storage.sync.get(null, (result) => {
+                        const keysToRemove = Object.keys(result).filter(key => key.startsWith('note_'));
+                        chrome.storage.sync.remove(keysToRemove, resolve);
+                    });
                 });
                 updateStatus('All notes cleared');
                 loadNotesList();
@@ -154,10 +164,12 @@ function initializePopup() {
     downloadBtn.addEventListener('click', async () => {
     try {
         const result = await new Promise((resolve) => {
-            chrome.storage.sync.get(['notes'], resolve);
+            chrome.storage.sync.get(null, resolve);
         });
 
-        const notes = result.notes || [];
+        const notes = Object.keys(result)
+            .filter(key => key.startsWith('note_'))
+            .map(key => result[key]);
         if (notes.length === 0) {
             updateStatus('No notes to download');
             return;
@@ -199,11 +211,13 @@ function initializePopup() {
 }
 
 function loadNotesList() {
-    const storageKey = 'notes';
-    chrome.storage.sync.get([storageKey], (result) => {
-        const notes = result[storageKey] || [];
+    chrome.storage.sync.get(null, (result) => {
+        const notes = Object.keys(result)
+            .filter(key => key.startsWith('note_'))
+            .map(key => result[key]);
+
         const notesList = document.getElementById('notesList');
-        notesList.innerHTML = ''; 
+        notesList.innerHTML = '';
 
         notes.forEach(note => {
             const listItem = document.createElement('li');

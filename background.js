@@ -115,7 +115,7 @@ const onClicked = (info, tab) => {
     .catch(error => {
         console.error('Error extracting page metadata:', error);
         
-        // Fallback note creation without metadata
+        // Fallback to note creation without metadata
         const note = {
             content: info.selectionText,
             type: 'selection',
@@ -139,20 +139,30 @@ const onClicked = (info, tab) => {
 };
 
 function saveNoteToStorage(note) {
-    const storageKey = 'notes';
-    chrome.storage.sync.get([storageKey], (result) => {
-        const notes = result[storageKey] || [];
-        if (note.type === 'selection') {
-            note.tag = 'Context Menu'; 
-        } else {
-            note.tag = 'Manual Entry'; 
-        }
-        notes.push(note);
-        chrome.storage.sync.set({ [storageKey]: notes }, () => {
-            console.log('Note saved successfully!');
+    const noteId = `note_${Date.now()}`;
+    note.tag = note.type === 'selection' ? 'Context Menu' : 'Manual Entry';
+    console.log('Note size in bytes:', JSON.stringify(note).length);
+    chrome.storage.sync.get(null, (result) => {
+        console.log('Existing notes:', result);
+        const notesToSave = {
+            [noteId]: note 
+        };
+        Object.keys(result).forEach(key => {
+            if (key.startsWith('note_')) {
+                notesToSave[key] = result[key];
+            }
+        });
+        chrome.storage.sync.set(notesToSave, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error saving note:', chrome.runtime.lastError);
+                throw new Error('Storage quota exceeded. Please clear some notes or reduce their size.');
+            } else {
+                console.log('Note saved successfully!');
+            }
         });
     });
 }
+
 
 const isTestEnvironment = typeof jest !== 'undefined';
 if (!isTestEnvironment) {
