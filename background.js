@@ -12,32 +12,27 @@ const extractPageMetadata = (tab) => {
         try {
             chrome.scripting.executeScript({
                 target: { tabId: tab.id },
-                function: () => {
+                func: () => {
                     const getContextText = (direction, charLimit) => {
-                        const selection = window.getSelection();
-                        if (selection.rangeCount === 0) return '';
-                        
-                        const range = selection.getRangeAt(0);
-                        const textNode = direction === 'before' ? range.startContainer : range.endContainer;
-                        const offset = direction === 'before' ? range.startOffset : range.endOffset;
-                        
-                        let contextRange = document.createRange();
                         try {
-                            if (direction === 'before') {
-                                // get text from start of parent to selection start
-                                contextRange.setStart(textNode.nodeType === Node.TEXT_NODE ? textNode : textNode.firstChild || textNode, 0);
-                                contextRange.setEnd(textNode, offset);
-                            } else {
-                                // get text from selection end to end of parent
-                                contextRange.setStart(textNode, offset);
-                                const endNode = textNode.nodeType === Node.TEXT_NODE ? textNode : textNode.lastChild || textNode;
-                                contextRange.setEndAfter(endNode, endNode.textContent?.length || 0);
-                            }
+                            const selection = window.getSelection();
+                            if (selection.rangeCount === 0) return '';
                             
-                            const contextText = contextRange.toString();
-                            return direction === 'before' 
-                                ? contextText.slice(-charLimit)
-                                : contextText.slice(0, charLimit);
+                            const range = selection.getRangeAt(0);
+                            
+                            const selectedText = selection.toString();
+                            const bodyText = document.body.innerText || document.body.textContent || '';
+                            const selectionIndex = bodyText.indexOf(selectedText);
+                            
+                            if (selectionIndex === -1) return '';
+                            
+                            if (direction === 'before') {
+                                const start = Math.max(0, selectionIndex - charLimit);
+                                return bodyText.slice(start, selectionIndex);
+                            } else {
+                                const end = Math.min(bodyText.length, selectionIndex + selectedText.length + charLimit);
+                                return bodyText.slice(selectionIndex + selectedText.length, end);
+                            }
                         } catch (error) {
                             console.error('Error getting context text:', error);
                             return '';
@@ -45,31 +40,39 @@ const extractPageMetadata = (tab) => {
                     };
 
                     const getSelectionPosition = () => {
-                        const selection = window.getSelection();
-                        if (selection.rangeCount === 0) return { start: 0, end: 0 };
+                        try {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount === 0) return { start: 0, end: 0 };
                         
-                        const range = selection.getRangeAt(0);
-                        const preRange = range.cloneRange();
-                        preRange.selectNodeContents(document.body);
-                        preRange.setEnd(range.startContainer, range.startOffset);
-                        
-                        const start = preRange.toString().length;
-                        const end = start + selection.toString().length;
-                        
-                        return { start, end };
+                            const selectedText = selection.toString();
+                            const bodyText = document.body.innerText || document.body.textContent || '';
+                            const start = bodyText.indexOf(selectedText);
+                            
+                            if (start === -1) return { start: 0, end: 0 };
+                            
+                            return { start, end };
+                        } catch (error) {
+                            console.error('Error getting selection position:', error);
+                            return { start: 0, end: 0 };
+                        }
                     };
 
                     const getRelativePagePosition = () => {
                         const selection = window.getSelection();
                         if (selection.rangeCount === 0) return 0;
                         
-                        const range = selection.getRangeAt(0);
-                        const rect = range.getBoundingClientRect();
-                        const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-                        const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-                        const selectionTop = currentScroll + rect.top;
+                        try {
+                            const range = selection.getRangeAt(0);
+                            const rect = range.getBoundingClientRect();
+                            const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+                            const selectionTop = currentScroll + rect.top;
                         
-                        return Math.min(1, Math.max(0, selectionTop / documentHeight));
+                            return Math.min(1, Math.max(0, selectionTop / documentHeight));
+                        } catch (error) {
+                            console.error('Error getting relative page position:', error);
+                            return 0;
+                        }
                     };
 
                     const extractHeadingHierarchy = () => {
@@ -107,9 +110,10 @@ const extractPageMetadata = (tab) => {
                     };
 
                     // Extract comprehensive metadata
-                    const selectionPosition = getSelectionPosition();
                     const selectedText = window.getSelection().toString();
-                    const pageWordCount = document.body.innerText.trim().split(/\s+/).filter(word => word.length > 0).length;
+                    const selectionPosition = getSelectionPosition();
+                    const bodyText = document.body.innerText || document.body.textContent || '';
+                    const pageWordCount = bodyText.trim().split(/\s+/).filter(word => word.length > 0).length;
 
                     
                     const metadata = {
@@ -223,19 +227,21 @@ const onClicked = (info, tab) => {
                 // Page context
                 url: pageMetadata.url || tab.url,
                 title: pageMetadata.title || tab.title,
+                pageTitle: pageMetadata.title || tab.title, // Add this for popup compatibility
                 domain: pageMetadata.domain || new URL(tab.url).hostname,
                 language: pageMetadata.language || 'unknown',
                 contentType: pageMetadata.contentType || 'text/html',
-                pageLoadTimestamp: pageMetadata.pageLoadTimestamp || new Date().toISOString(),
                 
                 // Selection details
                 selected_text: pageMetadata.selected_text || info.selectionText,
                 wordCount: pageMetadata.wordCount || info.selectionText.trim().split(/\s+/).filter(word => word.length > 0).length,
                 selection_length: pageMetadata.selection_length || info.selectionText.length,
-                selectionLength: info.selectionText.length, // Duplicate for compatibility
+                selectionLength: info.selectionText.length,
                 context_before: pageMetadata.context_before || '',
                 context_after: pageMetadata.context_after || '',
-                textPosition: pageMetadata.textPosition || 0,
+                selection_start_offset: pageMetadata.selection_start_offset || 0,
+                selection_end_offset: pageMetadata.selection_end_offset || 0,
+                relative_position: pageMetadata.relative_position || 0,
                 
                 // Page structure
                 full_page_word_count: pageMetadata.full_page_word_count || 0,
@@ -247,9 +253,12 @@ const onClicked = (info, tab) => {
                 video_count: pageMetadata.video_count || 0,
                 
                 // Content type indicators
-                hasCode: pageMetadata.hasCode || false,
-                hasMathFormula: pageMetadata.hasMathFormula || false,
+                has_code: pageMetadata.has_code || false,
+                has_math: pageMetadata.has_math || false,
                 has_data_tables: pageMetadata.has_data_tables || false,
+                external_links: pageMetadata.external_links || 0,
+                internal_links: pageMetadata.internal_links || 0,
+                citations: pageMetadata.citations || 0,
                 
                 // User behavior
                 time_on_page: pageMetadata.time_on_page || 0,
@@ -259,18 +268,15 @@ const onClicked = (info, tab) => {
                 // Classification
                 content_category: pageMetadata.content_category || 'general',
                 knowledge_level: pageMetadata.knowledge_level || 'unknown',
+                primary_domain: pageMetadata.primary_domain || '',
                 
                 // Technical
                 browser: pageMetadata.browser || navigator.userAgent,
                 capture_trigger: pageMetadata.capture_trigger || 'context_menu',
-                
-                // Action metadata
                 intent: 'contextMenuCapture'
             },
-
             tag: 'Context Menu'
         };
-
         
         console.log('Saving Enhanced Note:', note);
         saveNoteToStorage(note);
@@ -293,7 +299,9 @@ const onClicked = (info, tab) => {
                 annotationTimestamp: new Date().toISOString(),
                 selectionLength: info.selectionText.length,
                 intent: 'contextMenuCapture',
-                wordCount: info.selectionText.trim().split(/\s+/).filter(word => word.length > 0).length
+                wordCount: info.selectionText.trim().split(/\s+/).filter(word => word.length > 0).length,
+                pageTitle: tab.title,
+                domain: new URL(tab.url).hostname
             }
         };
 
@@ -320,15 +328,15 @@ function saveNoteToStorage(note) {
                         notesToSave[key] = result[key];
                     }
                 });
-            chrome.storage.sync.set(notesToSave, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error saving note:', chrome.runtime.lastError);
-                    reject(chrome.runtime.lastError);
-                } else {
-                    console.log('Note saved successfully!');
-                    resolve(noteId);
-                }
-            });
+                chrome.storage.sync.set(notesToSave, () => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error saving note:', chrome.runtime.lastError);
+                        reject(chrome.runtime.lastError);
+                    } else {
+                        console.log('Note saved successfully!');
+                        resolve(noteId);
+                    }
+                });
             } catch (error) {
                 console.error('Error saving note:', error);
                 reject(error);

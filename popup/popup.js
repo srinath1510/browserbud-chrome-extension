@@ -40,8 +40,12 @@ function initializePopup() {
                 },
                 metadata: {
                     wordCount: notes.trim().split(/\s+/).length,
-                    annotationTimestamp: new Date().toISOString()
-                }
+                    annotationTimestamp: new Date().toISOString(),
+                    pageTitle: 'Manual Entry',
+                    domain: 'extension',
+                    capture_trigger: 'manual_entry'
+                },
+                tag: 'Manual Entry'
             };
     
             const existingNotes = Object.keys(result)
@@ -119,21 +123,16 @@ function initializePopup() {
 
             const notes = Object.keys(result)
             .filter(key => key.startsWith('note_'))
-            .map(key => result[key]);
+            .map(key => result[key])
+            .sort((a, b) => new Date(b.source.timestamp) - new Date(a.source.timestamp));
 
             if (notes.length === 0) {
+                const notesList = document.getElementById('notesList');
+                notesList.innerHTML = '<li>No saved notes yet</li>';
                 return; 
             }
-
-            const notesList = document.getElementById('notesList');
-            notesList.innerHTML = '';
-
-            notes.forEach(note => {
-                const listItem = document.createElement('li');
-                listItem.textContent = note.content;
-                notesList.appendChild(listItem);
-            });
-
+            
+            loadNotesList();
             updateCharCount();
         } catch (error) {
             console.error('Error loading notes:', error);
@@ -169,14 +168,44 @@ function initializePopup() {
 
         const notes = Object.keys(result)
             .filter(key => key.startsWith('note_'))
-            .map(key => result[key]);
+            .map(key => result[key])
+            .sort((a, b) => new Date(b.source.timestamp) - new Date(a.source.timestamp));
+
         if (notes.length === 0) {
             updateStatus('No notes to download');
             return;
         }
 
         // Extract only the content of the notes
-        const contentToDownload = notes.map(note => note.content).join('\n\n');
+        const contentToDownload = notes.map(note => {
+            let output = `## ${note.metadata?.pageTitle || note.source?.title || 'Untitled'}\n\n`;
+            output += `**Content:** ${note.content}\n\n`;
+            
+            if (note.metadata) {
+                output += `**Metadata:**\n`;
+                output += `- Source: ${note.metadata.url || note.source?.url || 'Unknown'}\n`;
+                output += `- Domain: ${note.metadata.domain || 'Unknown'}\n`;
+                output += `- Captured: ${new Date(note.source.timestamp).toLocaleString()}\n`;
+                output += `- Words: ${note.metadata.wordCount || 0}\n`;
+                output += `- Type: ${note.type}\n`;
+                
+                if (note.metadata.content_category) {
+                    output += `- Category: ${note.metadata.content_category}\n`;
+                }
+                if (note.metadata.knowledge_level) {
+                    output += `- Knowledge Level: ${note.metadata.knowledge_level}\n`;
+                }
+                if (note.metadata.has_code) {
+                    output += `- Contains Code: Yes\n`;
+                }
+                if (note.metadata.has_math) {
+                    output += `- Contains Math: Yes\n`;
+                }
+            }
+            
+            return output + '\n---\n\n';
+        }).join('');
+
 
         const blob = new Blob([contentToDownload], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
@@ -188,6 +217,7 @@ function initializePopup() {
         a.click();
 
         URL.revokeObjectURL(url);
+        updateStatus('Notes downloaded successfully!');
     } catch (error) {
         console.error('Error downloading notes:', error);
         updateStatus('Error downloading notes!');
@@ -214,28 +244,38 @@ function loadNotesList() {
     chrome.storage.sync.get(null, (result) => {
         const notes = Object.keys(result)
             .filter(key => key.startsWith('note_'))
-            .map(key => result[key]);
+            .map(key => result[key])
+            .sort((a, b) => new Date(b.source.timestamp) - new Date(a.source.timestamp));
 
         const notesList = document.getElementById('notesList');
         notesList.innerHTML = '';
 
+        if (notes.length === 0) {
+            notesList.innerHTML = '<li>No saved notes yet</li>';
+            return;
+        }
+
         notes.forEach(note => {
             const listItem = document.createElement('li');
 
-            const contentSpan = document.createElement('span');
-            contentSpan.textContent = note.content;
+            const contentSpan = document.createElement('div');
+            contentSpan.textContent = note.content.length > 100 ? 
+                note.content.substring(0, 100) + '...' : 
+                note.content;
             listItem.appendChild(contentSpan);
 
             if (note.metadata) {
                 const metadataDiv = document.createElement('div');
-                metadataDiv.className = 'note-metadata';
 
                 const metadataDetails = [
                     note.metadata.pageTitle && `Source: ${note.metadata.pageTitle}`,
                     note.metadata.domain && `Domain: ${note.metadata.domain}`,
                     `Captured: ${new Date(note.source.timestamp).toLocaleString()}`,
-                    note.metadata.wordCount && `Words: ${note.metadata.wordCount}`
+                    note.metadata.wordCount && `Words: ${note.metadata.wordCount}`,
+                    note.metadata.content_category && `Category: ${note.metadata.content_category}`,
+                    note.metadata.knowledge_level && `Level: ${note.metadata.knowledge_level}`
                 ].filter(Boolean).join(' | ');
+                
                 metadataDiv.textContent = metadataDetails;
                 listItem.appendChild(metadataDiv);
             }
