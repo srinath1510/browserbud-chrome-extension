@@ -263,8 +263,7 @@ const onClicked = (info, tab) => {
                 // User behavior
                 time_on_page: pageMetadata.time_on_page || 0,
                 scroll_depth_at_selection: pageMetadata.scroll_depth_at_selection || 0,
-                viewport_size: pageMetadata.viewport_size || `${screen.width}x${screen.height}`,
-                
+                viewport_size: pageMetadata.viewport_size || 'unknown',
                 // Classification
                 content_category: pageMetadata.content_category || 'general',
                 knowledge_level: pageMetadata.knowledge_level || 'unknown',
