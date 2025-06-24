@@ -5,7 +5,9 @@
   "description": "An intelligent note-taking extension",
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "activeTab",
+    "scripting"
   ],
   "action": {
     "default_popup": "popup/popup.html"
