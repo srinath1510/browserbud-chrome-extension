@@ -22,6 +22,11 @@ class BatchProcessor {
         // Bind methods to preserve context
         this.processBatch = this.processBatch.bind(this);
         this.checkConnectivity = this.checkConnectivity.bind(this);
+
+        this.processedNoteIds = new Set(); // Track processed notes
+    this.activeBakeRequests = new Map(); // Track active bake requests
+    this.lastBakeTime = null; // Track last bake timestamp
+    this.bakeThrottleTime = 10000; // 10 seconds between bakes
         
         console.log('BatchProcessor initialized with options:', options);
     }
@@ -44,6 +49,11 @@ class BatchProcessor {
         
         // periodic connectivity checks every 5 minutes
         this.connectivityTimer = setInterval(this.checkConnectivity, 5 * 60 * 1000);
+
+        this.cleanupTimer = setInterval(() => {
+            this.cleanupProcessedNoteIds();
+            this.cleanupLocalStorage();
+        }, 60 * 60 * 1000); // 1 hour
         
         console.log('BatchProcessor started successfully');
     }
@@ -61,6 +71,11 @@ class BatchProcessor {
             clearInterval(this.connectivityTimer);
             this.connectivityTimer = null;
         }
+
+        if (this.cleanupTimer) {
+            clearInterval(this.cleanupTimer);
+            this.cleanupTimer = null;
+        }
         
         console.log('BatchProcessor stopped');
     }
@@ -70,8 +85,28 @@ class BatchProcessor {
      * @param {Object} note - The note to add
      */
     addNote(note) {
+        // Generate or get note ID
+        const noteId = note.id || note.metadata?.local_id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        note.id = noteId;
+    
+        // Check for duplicates
+        if (this.processedNoteIds.has(noteId)) {
+            console.log(`Duplicate note detected, skipping: ${noteId}`);
+            return;
+        }
+    
+        // Check if note with same content already exists
+        const contentHash = this.hashContent(note.content);
+        const existingNote = this.pendingNotes.find(n => this.hashContent(n.content) === contentHash);
+    
+        if (existingNote) {
+            console.log('Note with similar content already in batch, skipping');
+            return;
+        }
         console.log('Adding note to batch:', note.content.substring(0, 50) + '...');
         
+        this.processedNoteIds.add(noteId);
+
         // Add to pending batch
         this.pendingNotes.push(note);
         
@@ -90,6 +125,18 @@ class BatchProcessor {
         this.updateBadge(this.pendingNotes.length.toString(), '#FF9800');
     }
 
+    hashContent(content) {
+        // Simple hash function to detect duplicate content
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString();
+    }
+    
+
     /**
      * Process the current batch of notes
      */
@@ -106,6 +153,8 @@ class BatchProcessor {
         
         this.isProcessing = true;
         console.log(`Processing batch of ${this.pendingNotes.length} notes...`);
+
+        const notesToProcess = [...this.pendingNotes];
         
         try {
             // Create batch payload
@@ -122,9 +171,15 @@ class BatchProcessor {
         
             if (response.success) {
                 console.log('Batch processed successfully:', response.data);
-                await this.clearProcessedNotesFromLocal(this.pendingNotes);
+                await this.clearProcessedNotesFromLocal(notesToProcess);
 
-                this.pendingNotes = [];
+                // Remove processed notes from pending (only the ones that were actually processed)
+                this.pendingNotes = this.pendingNotes.filter(note => 
+                    !notesToProcess.some(processed => 
+                        processed.id === note.id || 
+                        processed.metadata?.local_id === note.metadata?.local_id
+                    )
+                );
                 this.lastBatchTime = new Date().toISOString();
                 this.serverConnected = true;
 
@@ -188,8 +243,35 @@ class BatchProcessor {
      */
     async handleBakeRequest(bakeData) {
         console.log('Handling bake request from popup');
+
+        const now = Date.now();
+        if (this.lastBakeTime && (now - this.lastBakeTime) < this.bakeThrottleTime) {
+            const timeLeft = Math.ceil((this.bakeThrottleTime - (now - this.lastBakeTime)) / 1000);
+            console.log(`Bake throttled. Please wait ${timeLeft} seconds.`);
+            return {
+                success: false,
+                error: `Please wait ${timeLeft} seconds before starting another bake.`
+            };
+        }
+
+        const bakeId = `bake_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        if (this.activeBakeRequests.has(bakeId)) {
+            console.log('Bake request already in progress');
+            return {
+                success: false,
+                error: 'Bake request already in progress'
+            };
+        }
+
         
         try {
+            // Mark bake as active
+            this.activeBakeRequests.set(bakeId, {
+                startTime: now,
+                status: 'active'
+            });
+            
             // First, process any pending notes
             if (this.pendingNotes.length > 0) {
                 console.log('Processing pending notes before bake...');
@@ -222,6 +304,8 @@ class BatchProcessor {
             
             const result = await response.json();
             console.log('Bake request processed:', result);
+
+            this.lastBakeTime = now;
             
             // Update badge to show baking in progress
             this.updateBadge('🔥', '#FF5722');
@@ -231,6 +315,9 @@ class BatchProcessor {
             console.error('Bake request failed:', error);
             this.updateBadge('!', '#F44336');
             return { success: false, error: error.message };
+        } finally {
+            // Mark bake as complete
+            this.activeBakeRequests.delete(bakeId);
         }
     }
 
@@ -250,6 +337,19 @@ class BatchProcessor {
             apiUrl: this.apiBaseUrl,
             retryCount: this.maxRetries
         };
+    }
+
+    cleanupProcessedNoteIds() {
+        // Keep only recent processed note IDs (last 1000)
+        if (this.processedNoteIds.size > 1000) {
+            const idsArray = Array.from(this.processedNoteIds);
+            this.processedNoteIds.clear();
+            
+            // Keep only the most recent 500
+            idsArray.slice(-500).forEach(id => this.processedNoteIds.add(id));
+            
+            console.log('Cleaned up old processed note IDs');
+        }
     }
 
     /**
