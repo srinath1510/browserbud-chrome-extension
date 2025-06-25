@@ -7,6 +7,10 @@ class BatchProcessor {
         this.batchInterval = options.batchInterval || 2 * 60 * 1000; // 2 minutes
         this.maxLocalNotes = options.maxLocalNotes || 50;
         this.maxBatchSize = options.maxBatchSize || 10;
+
+        this.maxRetries = 3;
+        this.retryDelay = 1000; // ms
+        this.lastHealthCheck = null;
         
         // Internal state
         this.pendingNotes = [];
@@ -106,41 +110,30 @@ class BatchProcessor {
         try {
             // Create batch payload
             const batchPayload = {
-                notes: this.pendingNotes,
                 batch_id: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                notes: this.pendingNotes,
                 timestamp: new Date().toISOString(),
                 batch_size: this.pendingNotes.length,
                 processing_mode: 'async_batch'
             };
             
             // Send to server
-            const response = await fetch(`${this.apiBaseUrl}/notes/batch`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(batchPayload),
-                signal: AbortSignal.timeout(30000) // 30 second timeout
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Batch upload failed: ${response.status}`);
+            const response = await this.sendBatchWithRetry(batchPayload);
+        
+            if (response.success) {
+                console.log('Batch processed successfully:', response.data);
+                await this.clearProcessedNotesFromLocal(this.pendingNotes);
+
+                this.pendingNotes = [];
+                this.lastBatchTime = new Date().toISOString();
+                this.serverConnected = true;
+
+                this.updateBadge('✓', '#4CAF50');
+                setTimeout(() => this.updateBadge('', ''), 3000);
+
+            } else {
+                throw new Error(response.error || 'Batch upload failed');
             }
-            
-            const result = await response.json();
-            console.log('Batch processed successfully:', result);
-            
-            // Clear processed notes from local storage
-            await this.clearProcessedNotesFromLocal(this.pendingNotes);
-            
-            // Clear pending batch
-            this.pendingNotes = [];
-            this.lastBatchTime = new Date().toISOString();
-            this.serverConnected = true;
-            
-            // Update badge with success
-            this.updateBadge('✓', '#4CAF50');
-            setTimeout(() => this.updateBadge('', ''), 3000);
             
         } catch (error) {
             console.error('Batch processing failed:', error);
@@ -154,6 +147,38 @@ class BatchProcessor {
             console.log('Notes will be retried in next batch cycle');
         } finally {
             this.isProcessing = false;
+        }
+    }
+
+    async sendBatchWithRetry(batchData, attempt = 1) {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/notes/batch`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(batchData),
+                signal: AbortSignal.timeout(30000) // 30 second timeout
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorData}`);
+            }
+    
+            const responseData = await response.json();
+            return { success: true, data: responseData };
+    
+        } catch (error) {
+            console.error(`Batch send attempt ${attempt} failed:`, error.message);
+    
+            if (attempt < this.maxRetries) {
+                console.log(`Retrying in ${this.retryDelay}ms... (attempt ${attempt + 1}/${this.maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, this.retryDelay));
+                return this.sendBatchWithRetry(batchData, attempt + 1);
+            } else {
+                return { success: false, error: error.message };
+            }
         }
     }
 
@@ -173,9 +198,12 @@ class BatchProcessor {
             
             // Send bake request to server
             const bakePayload = {
-                ...bakeData,
-                trigger_source: 'extension_popup',
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                source: 'extension',
+                trigger_source: 'user_action',
+                includeAdditionalNotes: bakeData.includeAdditionalNotes || false,
+                additionalNotes: bakeData.additionalNotes || '',
+                ...bakeData
             };
             
             const response = await fetch(`${this.apiBaseUrl}/bake`, {
@@ -188,7 +216,8 @@ class BatchProcessor {
             });
             
             if (!response.ok) {
-                throw new Error(`Bake request failed: ${response.status}`);
+                const errorData = await response.text();
+                throw new Error(`Bake request failed: ${response.status} - ${errorData}`);
             }
             
             const result = await response.json();
@@ -196,10 +225,12 @@ class BatchProcessor {
             
             // Update badge to show baking in progress
             this.updateBadge('🔥', '#FF5722');
+            return { success: true, data: result };
             
         } catch (error) {
             console.error('Bake request failed:', error);
             this.updateBadge('!', '#F44336');
+            return { success: false, error: error.message };
         }
     }
 
@@ -214,7 +245,10 @@ class BatchProcessor {
             batchInterval: this.batchInterval / 1000 / 60, // minutes
             serverConnected: this.serverConnected,
             isProcessing: this.isProcessing,
-            maxBatchSize: this.maxBatchSize
+            maxBatchSize: this.maxBatchSize,
+            lastHealthCheck: this.lastHealthCheck,
+            apiUrl: this.apiBaseUrl,
+            retryCount: this.maxRetries
         };
     }
 
@@ -223,8 +257,10 @@ class BatchProcessor {
      * @param {Object} note - Note to save
      */
     saveNoteToLocalStorage(note) {
-        const noteId = note.metadata?.local_id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         note.id = noteId;
+        note.stored_at = new Date().toISOString();
+        note.sync_status = 'pending';
         
         chrome.storage.local.get(null, (result) => {
             const notesToSave = { [noteId]: note };
@@ -248,6 +284,33 @@ class BatchProcessor {
                 }
             });
         });
+    }
+
+    async triggerBake(additionalNotes = '', includeAdditionalNotes = false) {
+        const bakeData = {
+            additionalNotes,
+            includeAdditionalNotes
+        };
+        return await this.handleBakeRequest(bakeData);
+    }
+
+    async getServerStatus() {
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/status`, {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' },
+                signal: AbortSignal.timeout(5000)
+            });
+            
+            if (response.ok) {
+                return await response.json();
+            } else {
+                throw new Error(`Server status check failed: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Failed to get server status:', error);
+            return null;
+        }
     }
 
     /**
@@ -288,29 +351,35 @@ class BatchProcessor {
     }
 
     /**
-     * Check server connectivity
+     * Check Flask server connectivity
      */
     async checkConnectivity() {
         try {
             const response = await fetch(`${this.apiBaseUrl}/health`, {
                 method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
                 signal: AbortSignal.timeout(5000)
             });
             
             if (response.ok) {
-                console.log('Server connectivity confirmed');
+                const healthData = await response.json();
+                console.log('✅ Flask API server is healthy:', healthData);
                 this.serverConnected = true;
+                this.lastHealthCheck = new Date().toISOString();
                 
                 // Clear warning badge if no pending notes
                 if (this.pendingNotes.length === 0) {
                     this.updateBadge('', '');
                 }
             } else {
-                throw new Error('Server health check failed');
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
             }
         } catch (error) {
-            console.warn('Server not available:', error);
+            console.warn('❌ Flask API server not available:', error.message);
             this.serverConnected = false;
+            this.lastHealthCheck = new Date().toISOString();
             this.updateBadge('⚠', '#FF9800');
         }
     }
@@ -365,7 +434,6 @@ class BatchProcessor {
     }
 }
 
-export { BatchProcessor };
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { BatchProcessor };
