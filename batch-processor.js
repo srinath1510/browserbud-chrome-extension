@@ -365,6 +365,8 @@ class BatchProcessor {
     }
 }
 
+export { BatchProcessor };
+
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = { BatchProcessor };
 }
