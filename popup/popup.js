@@ -207,7 +207,7 @@ async function loadRecentNotes() {
         
         const notes = Object.keys(result)
         .filter(key => {
-            const isNote = key.startsWith('note_') || key.startsWith('local_');
+            const isNote = key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_');
             if (isNote) {
                 console.log('Found note key:', key, 'data:', result[key]);
             }
@@ -264,7 +264,7 @@ async function debugStorageKeys() {
         notesList.innerHTML = '';
         
         const noteKeys = Object.keys(result).filter(key => 
-            key.startsWith('note_') || key.startsWith('local_')
+            key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_')
         );
         
         if (noteKeys.length === 0) {
