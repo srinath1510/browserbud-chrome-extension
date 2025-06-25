@@ -414,10 +414,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             break;
             
         case 'triggerBake':
-            console.log('Triggering bake request');
-            batchProcessor.handleBakeRequest(request.data)
-                .then(() => sendResponse({ status: 'baking' }))
-                .catch(error => sendResponse({ error: error.message }));
+            console.log('Triggering bake process from popup');
+            (async () => {
+                try {
+                    const result = await batchProcessor.triggerBake(
+                        request.additionalNotes || '',
+                        request.includeAdditionalNotes || false
+                    );
+                    sendResponse(result);
+                } catch (error) {
+                    console.error('Error in bake process:', error);
+                    sendResponse({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            })();
             return true; // Keep message channel open for async response
             
         case 'addNote':
@@ -426,11 +438,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ status: 'added' });
             break;
             
-        case 'forceBatch':
+        case 'forceBatchProcess':
             console.log('Force processing batch');
             batchProcessor.forceBatch()
-                .then(() => sendResponse({ status: 'processed' }))
-                .catch(error => sendResponse({ error: error.message }));
+                .then((result) => sendResponse({ 
+                    success: true, 
+                    status: 'processed',
+                    result: result 
+                }))
+                .catch(error => sendResponse({ 
+                    success: false,
+                    error: error.message 
+                }));
             return true; // Keep message channel open for async response
             
         case 'getStatistics':
@@ -444,10 +463,89 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             batchProcessor.reset();
             sendResponse({ status: 'reset' });
             break;
+        
+        case 'getServerStatus':
+            console.log('Getting Flask API server status');
+        
+            (async () => {
+                try {
+                    const serverStatus = await batchProcessor.getServerStatus();
+                    sendResponse(serverStatus);
+                } catch (error) {
+                    console.error('Error getting server status:', error);
+                    sendResponse(null);
+                }
+            })();
+            return true;
+        
+        case 'checkConnectivity':
+            console.log('Checking Flask API server connectivity');
+            
+            (async () => {
+                try {
+                    await batchProcessor.checkConnectivity();
+                    const status = batchProcessor.getStatus();
+                    sendResponse({ 
+                        success: true, 
+                        connected: status.serverConnected,
+                        lastHealthCheck: status.lastHealthCheck 
+                    });
+                } catch (error) {
+                    console.error('Error checking connectivity:', error);
+                    sendResponse({ 
+                        success: false, 
+                        connected: false,
+                        error: error.message 
+                    });
+                }
+            })();
+            return true;
+        
+        case 'getPendingCount':
+            console.log('Getting pending notes count');
+            const pendingStatus = batchProcessor.getStatus();
+            sendResponse({ 
+                pendingCount: pendingStatus.pendingCount,
+                serverConnected: pendingStatus.serverConnected 
+            });
+            break;
+
+        case 'triggerBakeWithData':
+            console.log('Triggering bake with specific data');
+            
+            (async () => {
+                try {
+                    const result = await batchProcessor.handleBakeRequest(request.bakeData);
+                    sendResponse(result);
+                } catch (error) {
+                    console.error('Error in bake with data:', error);
+                    sendResponse({
+                        success: false,
+                        error: error.message
+                    });
+                }
+            })();
+            
+            return true;
             
         default:
             console.warn('Unknown action:', request.action);
-            sendResponse({ error: 'Unknown action: ' + request.action });
+            sendResponse({ 
+                error: 'Unknown action: ' + request.action,
+                availableActions: [
+                    'processPendingBatch',
+                    'getBatchStatus', 
+                    'triggerBake',
+                    'addNote',
+                    'forceBatchProcess',
+                    'getStatistics',
+                    'resetBatchProcessor',
+                    'getServerStatus',
+                    'checkConnectivity',
+                    'getPendingCount',
+                    'triggerBakeWithData'
+                ] 
+            });
     }
 });
 

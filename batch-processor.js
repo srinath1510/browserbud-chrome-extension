@@ -434,11 +434,7 @@ class BatchProcessor {
     }
 }
 
-
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { BatchProcessor };
-}
-
+export { BatchProcessor };
 if (typeof window !== 'undefined') {
     window.BatchProcessor = BatchProcessor;
 }

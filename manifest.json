@@ -32,7 +32,10 @@
 
   "web_accessible_resources": [
     {
-      "resources": ["batch-processor.js"],
+      "resources": [
+        "batch-processor.js",
+        "popup/*"
+      ],
       "matches": ["<all_urls>"]
     }
   ]

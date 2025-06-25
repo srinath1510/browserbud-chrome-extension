@@ -108,6 +108,10 @@ function setupEventListeners() {
         });
     }
 
+    if (elements.bakeBtn) {
+        elements.bakeBtn.addEventListener('click', handleBakeNotes);
+    }
+
     // Process pending batch button (if exists)
     const processPendingBtn = document.getElementById('processPendingBtn');
     if (processPendingBtn) {
@@ -129,6 +133,9 @@ async function loadInitialData() {
         // Load batch status from background script
         console.log('Step 2: Loading batch status...');
         await loadBatchStatus();
+
+        console.log('Step 2.5: Checking server connection...');
+        await checkServerConnection();
         
         // Load recent notes
         console.log('Step 3: Loading recent notes...');
@@ -326,8 +333,8 @@ function updateSessionStatusDisplay() {
 function getStatusText(status) {
     console.log('Getting status text for:', status);
 
-    if (!currentSessionData.serverConnected) {
-        return { text: 'Offline', class: 'pending' };
+    if (!status.serverConnected) {
+        return { text: 'Offline', class: 'offline' };
     }
     
     if (status.isProcessing) {
@@ -335,10 +342,10 @@ function getStatusText(status) {
     }
     
     if (status.pendingCount > 0) {
-        return { text: 'Pending', class: 'pending' };
+        return { text: `${status.pendingCount} Pending`, class: 'pending' };
     }
     
-    return { text: 'Synced', class: 'synced' };
+    return { text: 'Connected', class: 'synced' };
 }
 
 
@@ -554,6 +561,108 @@ async function processPendingBatch() {
     }
 }
 
+async function handleBakeNotes() {
+    try {
+        console.log('🔥 Bake button clicked');
+        
+        // Disable button and show processing state
+        elements.bakeBtn.disabled = true;
+        elements.bakeBtn.innerHTML = `
+            <div class="bake-content">
+                <span>🔄 Baking...</span>
+                <div class="bake-subtitle">Processing your knowledge</div>
+            </div>
+        `;
+        
+        // Get additional notes if any
+        const additionalNotes = elements.notesArea ? elements.notesArea.value.trim() : '';
+        const includeAdditionalNotes = additionalNotes.length > 0;
+        
+        console.log('Sending bake request with:', { 
+            hasAdditionalNotes: !!additionalNotes, 
+            includeAdditionalNotes 
+        });
+        
+        // Send bake request to background script
+        const response = await chrome.runtime.sendMessage({
+            action: 'triggerBake',
+            additionalNotes: additionalNotes,
+            includeAdditionalNotes: includeAdditionalNotes
+        });
+        
+        console.log('Bake response:', response);
+        
+        if (response && response.success) {
+            // Show success state
+            elements.bakeBtn.innerHTML = `
+                <div class="bake-content">
+                    <span>✅ Baking Started!</span>
+                    <div class="bake-subtitle">Processing ${response.data?.notes_count || 'your'} notes</div>
+                </div>
+            `;
+            
+            // Clear additional notes if they were included
+            if (includeAdditionalNotes && elements.notesArea) {
+                elements.notesArea.value = '';
+                updateCharCount();
+            }
+            
+            updateStatus(`Baking initiated! Processing ${response.data?.notes_count || ''} notes.`);
+            
+            // Reset button after delay
+            setTimeout(() => {
+                resetBakeButton();
+            }, 3000);
+            
+        } else {
+            throw new Error(response?.error || 'Baking failed');
+        }
+        
+    } catch (error) {
+        console.error('Error in bake process:', error);
+        
+        // Show error state
+        elements.bakeBtn.innerHTML = `
+            <div class="bake-content">
+                <span>❌ Bake Failed</span>
+                <div class="bake-subtitle">Click to retry</div>
+            </div>
+        `;
+        
+        updateStatus('Baking failed. Please try again.');
+        
+        // Reset button after delay
+        setTimeout(() => {
+            resetBakeButton();
+        }, 3000);
+    }
+}
+
+async function checkServerConnection() {
+    try {
+        const serverStatus = await chrome.runtime.sendMessage({
+            action: 'getServerStatus'
+        });
+        
+        if (serverStatus) {
+            console.log('Server status:', serverStatus);
+            if (currentSessionData.batchStatus) {
+                currentSessionData.batchStatus.serverConnected = true;
+            }
+        } else {
+            console.log('Server not available');
+            if (currentSessionData.batchStatus) {
+                currentSessionData.batchStatus.serverConnected = false;
+            }
+        }
+        
+        updateSessionStatusDisplay();
+        
+    } catch (error) {
+        console.error('Error checking server connection:', error);
+    }
+}
+
 /**
  * Display notes in the notes list
  */
@@ -680,6 +789,18 @@ function updateStatus(message) {
     console.log('Status:', message);
 }
 
+function resetBakeButton() {
+    if (elements.bakeBtn) {
+        elements.bakeBtn.disabled = false;
+        elements.bakeBtn.innerHTML = `
+            <div class="bake-content">
+                <span>🧠 Bake Notes</span>
+                <div class="bake-subtitle">Transform into knowledge</div>
+            </div>
+        `;
+    }
+}
+
 /**
  * Refresh popup data
  */
@@ -693,8 +814,39 @@ async function refreshData() {
     }
 }
 
+async function forceBatchProcess() {
+    try {
+        console.log('🔧 Forcing batch process...');
+        
+        const response = await chrome.runtime.sendMessage({
+            action: 'forceBatchProcess'
+        });
+        
+        console.log('Force batch response:', response);
+        
+        if (response && response.success) {
+            updateStatus('Batch processed successfully!');
+        } else {
+            updateStatus('Batch processing failed.');
+        }
+        
+        // Refresh status
+        await loadBatchStatus();
+        
+    } catch (error) {
+        console.error('Error forcing batch process:', error);
+        updateStatus('Error in batch processing.');
+    }
+}
+
 // Auto-refresh data every 30 seconds
 setInterval(refreshData, 30000);
+
+window.debugBaking = {
+    forceBatch: forceBatchProcess,
+    checkServer: checkServerConnection,
+    bakeNotes: handleBakeNotes
+};
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
