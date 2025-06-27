@@ -24,9 +24,9 @@ class BatchProcessor {
         this.checkConnectivity = this.checkConnectivity.bind(this);
 
         this.processedNoteIds = new Set(); // Track processed notes
-    this.activeBakeRequests = new Map(); // Track active bake requests
-    this.lastBakeTime = null; // Track last bake timestamp
-    this.bakeThrottleTime = 10000; // 10 seconds between bakes
+        this.activeBakeRequests = new Map(); // Track active bake requests
+        this.lastBakeTime = null; // Track last bake timestamp
+        this.bakeThrottleTime = 10000; // 10 seconds between bakes
         
         console.log('BatchProcessor initialized with options:', options);
     }
