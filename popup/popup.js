@@ -19,6 +19,21 @@ document.addEventListener('DOMContentLoaded', function() {
     initializePopup();
 });
 
+/**
+ * Listener for background script notifications
+ */
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'notesProcessed') {
+        console.log('🔄 Background processed notes - refreshing popup display');
+        
+        loadRecentNotes().then(() => {
+            updateSessionStatusDisplay();
+            const count = message.data?.processedCount || 0;
+            updateStatus(`${count} notes auto-synced to server`);
+        });
+    }
+});
+
 
 /**
  * Initialize popup functionality
@@ -474,12 +489,53 @@ async function handleBake() {
 async function clearNotes() {
     if (confirm('Clear all notes? This cannot be undone.')) {
         try {
-            elements.notesArea.value = '';
-            updateCharCount();
-            updateStatus('Notes cleared');
+            updateStatus('Clearing notes...');
+
+            // clear notes from server
+            const response = await fetch(API_BASE_URL + '/notes', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('Server clear result:', result);
+
+            // clear local Chrome storage
+            const storageResult = await chrome.storage.local.get(null);
+            const noteKeys = Object.keys(storageResult).filter(key => 
+                key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_')
+            );
+            
+            if (noteKeys.length > 0) {
+                await chrome.storage.local.remove(noteKeys);
+                console.log(`Cleared ${noteKeys.length} notes from local storage:`, noteKeys);
+            }
+
+            if (elements.notesArea) {
+                elements.notesArea.value = '';
+                updateCharCount();
+            }
+
+            currentSessionData.notes = [];
+            currentSessionData.totalCaptured = 0;
+            await loadRecentNotes();
+            updateSessionStatusDisplay();
+
+            try {
+                await chrome.runtime.sendMessage({ action: 'clearBatch' });
+            } catch (bgError) {
+                console.warn('Could not clear background batch:', bgError);
+            }
+            updateStatus('All notes cleared successfully');
+
         } catch (error) {
             console.error('Error clearing notes:', error);
-            updateStatus('Error clearing notes');
+            updateStatus('Error clearing notes' +  error.message);
         }
     }
 }

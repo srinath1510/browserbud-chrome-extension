@@ -155,6 +155,7 @@ class BatchProcessor {
         console.log(`Processing batch of ${this.pendingNotes.length} notes...`);
 
         const notesToProcess = [...this.pendingNotes];
+        const processedCount = notesToProcess.length;
         
         try {
             // Create batch payload
@@ -171,7 +172,7 @@ class BatchProcessor {
         
             if (response.success) {
                 console.log('Batch processed successfully:', response.data);
-                await this.clearProcessedNotesFromLocal(notesToProcess);
+                await this.clearAllProcessedNotesFromLocal(notesToProcess);
 
                 // Remove processed notes from pending (only the ones that were actually processed)
                 this.pendingNotes = this.pendingNotes.filter(note => 
@@ -182,6 +183,8 @@ class BatchProcessor {
                 );
                 this.lastBatchTime = new Date().toISOString();
                 this.serverConnected = true;
+
+                this.notifyPopupOfProcessing(processedCount);
 
                 this.updateBadge('✓', '#4CAF50');
                 setTimeout(() => this.updateBadge('', ''), 3000);
@@ -203,6 +206,37 @@ class BatchProcessor {
         } finally {
             this.isProcessing = false;
         }
+    }
+
+    /**
+     * Clear ALL processed notes from local storage (not just by ID)
+     */
+    async clearAllProcessedNotesFromLocal(processedNotes) {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(null, (result) => {
+
+                const allNoteKeys = Object.keys(result).filter(key => 
+                    key.startsWith('note_') || 
+                    key.startsWith('local_') || 
+                    key.startsWith('manual_')
+                );
+                
+                if (allNoteKeys.length > 0) {
+                    // Clear ALL notes from storage after successful batch processing
+                    chrome.storage.local.remove(allNoteKeys, () => {
+                        if (chrome.runtime.lastError) {
+                            console.error('Error clearing all processed notes:', chrome.runtime.lastError);
+                        } else {
+                            console.log(`🧹 Cleared ALL ${allNoteKeys.length} notes from local storage after batch processing`);
+                        }
+                        resolve();
+                    });
+                } else {
+                    console.log('No notes found in storage to clear');
+                    resolve();
+                }
+            });
+        });
     }
 
     async sendBatchWithRetry(batchData, attempt = 1) {
@@ -386,6 +420,31 @@ class BatchProcessor {
         });
     }
 
+    /**
+     * Notify popup that notes have been processed
+     */
+    notifyPopupOfProcessing(processedCount) {
+    try {
+        chrome.runtime.sendMessage({
+            action: 'notesProcessed',
+            data: { 
+                processedCount: processedCount,
+                timestamp: new Date().toISOString(),
+                source: 'auto_batch'
+            }
+        }).catch(() => {
+            // Popup might not be open - that's fine
+            console.log('Popup not open to receive processing notification');
+        });
+        
+        console.log(`📱 Notified popup that ${processedCount} notes were processed`);
+        
+    } catch (error) {
+        console.log('Could not notify popup (popup may be closed):', error.message);
+    }
+}
+
+
     async triggerBake(additionalNotes = '', includeAdditionalNotes = false) {
         const bakeData = {
             additionalNotes,
@@ -410,24 +469,6 @@ class BatchProcessor {
         } catch (error) {
             console.error('Failed to get server status:', error);
             return null;
-        }
-    }
-
-    /**
-     * Clear processed notes from local storage
-     * @param {Array} processedNotes - Notes that were processed
-     */
-    async clearProcessedNotesFromLocal(processedNotes) {
-        const noteIds = processedNotes.map(note => note.id || note.metadata?.local_id).filter(Boolean);
-        
-        if (noteIds.length > 0) {
-            chrome.storage.local.remove(noteIds, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error clearing processed notes:', chrome.runtime.lastError);
-                } else {
-                    console.log(`Cleared ${noteIds.length} processed notes from local storage`);
-                }
-            });
         }
     }
 
