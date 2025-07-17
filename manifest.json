@@ -1,18 +1,42 @@
 {
   "manifest_version": 3,
   "name": "Smart Notes",
-  "version": "1.0",
-  "description": "An intelligent note-taking extension",
+  "version": "1.0.0",
+  "description": "Intelligent note-taking with AI-powered knowledge processing",
+
   "permissions": [
     "storage",
     "contextMenus",
     "activeTab",
     "scripting"
   ],
-  "action": {
-    "default_popup": "popup/popup.html"
-  },
+
+  "host_permissions": [
+    "http://localhost:8000/*",
+    "https://your-api-domain.com/*"
+  ],
+
   "background": {
-    "service_worker": "background.js"
-  }
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "Smart Notes"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "batch-processor.js",
+        "popup/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
