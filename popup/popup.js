@@ -228,24 +228,16 @@ async function loadRecentNotes() {
         console.log('Raw storage result:', result);
         
         const notes = Object.keys(result)
-        .filter(key => {
-            const isNote = key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_');
-            if (isNote) {
-                console.log('Found note key:', key, 'data:', result[key]);
-            }
-            return isNote;
-        })
+        .filter(key => key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_'))
         .map(key => ({ 
             key,
             id: key,
             ...result[key]
         }))
-        .filter(note => {
-            return note.content && (note.source || note.metadata);
-        })
+        .filter(note => note.content)
         .sort((a, b) => {
-            const aTime = new Date(a.source?.timestamp || a.metadata?.timestamp || 0);
-            const bTime = new Date(b.source?.timestamp || b.metadata?.timestamp || 0);
+            const aTime = new Date(a.timestamp || 0);
+            const bTime = new Date(b.timestamp || 0);
             return bTime - aTime;
         });
         console.log(`Processed ${notes.length} notes:`, notes)
@@ -739,25 +731,17 @@ function displayNotes(notes) {
             const li = document.createElement('li');
             
             const content = note.content || 'No content';
-            const maxLength = 150;
-            const displayContent = content.length > maxLength 
-                ? content.substring(0, maxLength) + '...' 
-                : content;
-        
-            const tag = note.tag || note.metadata?.capture_trigger || 'Unknown';
-            const domain = note.metadata?.domain || note.source?.domain || 'unknown';
-            const timestamp = note.source?.timestamp || note.metadata?.timestamp || Date.now();
-            const formattedTime = new Date(timestamp).toLocaleString();
-            const wordCount = note.metadata?.wordCount || 
-                            (content.trim().split(/\s+/).filter(word => word.length > 0).length);
-            
-        
+            const tag = note.intent || 'learn';
+            const domain = new URL(note.source_url || 'https://unknown').hostname;
+            const formattedTime = new Date(note.timestamp).toLocaleString();
+            const wordCount = content.trim().split(/\s+/).length;
+
             li.innerHTML = `
-                ${content}
+                ${content.length > 150 ? content.substring(0, 150) + '...' : content}
                 <span class="note-type">${tag}</span>
                 <div class="note-metadata">
-                    <strong>Domain:</strong> ${domain}<br>
-                    <strong>Captured:</strong> ${timestamp}<br>
+                    <strong>Source:</strong> ${note.title || domain}<br>
+                    <strong>Captured:</strong> ${formattedTime}<br>
                     <strong>Words:</strong> ${wordCount}
                 </div>
             `;
