@@ -228,24 +228,16 @@ async function loadRecentNotes() {
         console.log('Raw storage result:', result);
         
         const notes = Object.keys(result)
-        .filter(key => {
-            const isNote = key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_');
-            if (isNote) {
-                console.log('Found note key:', key, 'data:', result[key]);
-            }
-            return isNote;
-        })
+        .filter(key => key.startsWith('note_') || key.startsWith('local_') || key.startsWith('manual_'))
         .map(key => ({ 
             key,
             id: key,
             ...result[key]
         }))
-        .filter(note => {
-            return note.content && (note.source || note.metadata);
-        })
+        .filter(note => note.content)
         .sort((a, b) => {
-            const aTime = new Date(a.source?.timestamp || a.metadata?.timestamp || 0);
-            const bTime = new Date(b.source?.timestamp || b.metadata?.timestamp || 0);
+            const aTime = new Date(a.timestamp || 0);
+            const bTime = new Date(b.timestamp || 0);
             return bTime - aTime;
         });
         console.log(`Processed ${notes.length} notes:`, notes)
@@ -377,31 +369,20 @@ function debugCurrentState() {
 
 async function saveNotes() {
     try {
-        const notes = notesArea.value.trim();
+        const notes = elements.notesArea.value.trim();
         if (!notes) {
             updateStatus('No notes to save.');
             return;
         }
 
         const note = {
-            id: `note_${Date.now()}`,
             content: notes,
-            type: 'manual',
-            source: {
-                url: '',
-                title: '',
-                timestamp: new Date().toISOString()
-            },
-            metadata: {
-                wordCount: notes.trim().split(/\s+/).length,
-                annotationTimestamp: new Date().toISOString(),
-                pageTitle: 'Manual Entry',
-                domain: 'extension',
-                capture_trigger: 'manual_entry',
-                batch_pending: true,
-                local_id: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`                
-            },
-            tag: 'Manual Entry'
+            user_id: "browser_user",
+            source_url: "",
+            title: "Manual Entry",
+            timestamp: new Date().toISOString(),
+            intent: "reference",
+            user_note: ""
         };
 
         // Send to background script for processing
@@ -557,15 +538,11 @@ async function downloadNotes() {
         if (currentSessionData.notes.length > 0) {
             content += '=== Saved Notes ===\n';
             currentSessionData.notes.forEach((note, index) => {
-                content += `\n--- Note ${index + 1} (${note.tag || 'Unknown'}) ---\n`;
+                content += `\n--- Note ${index + 1} (${note.intent || 'learn'}) ---\n`;
                 content += `${note.content}\n`;
-                if (note.metadata?.pageTitle) {
-                    content += `Source: ${note.metadata.pageTitle}\n`;
-                }
-                if (note.source?.url) {
-                    content += `URL: ${note.source.url}\n`;
-                }
-                content += `Date: ${new Date(note.source?.timestamp || 0).toLocaleString()}\n`;
+                content += `Source: ${note.title || 'Unknown'}\n`;
+                content += `URL: ${note.source_url || 'Unknown'}\n`;
+                content += `Date: ${new Date(note.timestamp || 0).toLocaleString()}\n`;
             });
         }
         
@@ -750,25 +727,17 @@ function displayNotes(notes) {
             const li = document.createElement('li');
             
             const content = note.content || 'No content';
-            const maxLength = 150;
-            const displayContent = content.length > maxLength 
-                ? content.substring(0, maxLength) + '...' 
-                : content;
-        
-            const tag = note.tag || note.metadata?.capture_trigger || 'Unknown';
-            const domain = note.metadata?.domain || note.source?.domain || 'unknown';
-            const timestamp = note.source?.timestamp || note.metadata?.timestamp || Date.now();
-            const formattedTime = new Date(timestamp).toLocaleString();
-            const wordCount = note.metadata?.wordCount || 
-                            (content.trim().split(/\s+/).filter(word => word.length > 0).length);
-            
-        
+            const tag = note.intent || 'learn';
+            const domain = new URL(note.source_url || 'https://unknown').hostname;
+            const formattedTime = new Date(note.timestamp).toLocaleString();
+            const wordCount = content.trim().split(/\s+/).length;
+
             li.innerHTML = `
-                ${content}
+                ${content.length > 150 ? content.substring(0, 150) + '...' : content}
                 <span class="note-type">${tag}</span>
                 <div class="note-metadata">
-                    <strong>Domain:</strong> ${domain}<br>
-                    <strong>Captured:</strong> ${timestamp}<br>
+                    <strong>Source:</strong> ${note.title || domain}<br>
+                    <strong>Captured:</strong> ${formattedTime}<br>
                     <strong>Words:</strong> ${wordCount}
                 </div>
             `;

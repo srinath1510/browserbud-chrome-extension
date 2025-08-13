@@ -85,56 +85,34 @@ class BatchProcessor {
      * @param {Object} note - The note to add
      */
     addNote(note) {
-        // Generate or get note ID
-        const noteId = note.id || note.metadata?.local_id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        note.id = noteId;
-    
-        // Check for duplicates
-        if (this.processedNoteIds.has(noteId)) {
-            console.log(`Duplicate note detected, skipping: ${noteId}`);
+        // Validate note has required content
+        if (!note || !note.content || typeof note.content !== 'string') {
+            console.error('Invalid note - missing content:', note);
             return;
         }
+        const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        note.id = noteId;
     
-        // Check if note with same content already exists
+        // Simple content hash for duplicates
         const contentHash = this.hashContent(note.content);
         const existingNote = this.pendingNotes.find(n => this.hashContent(n.content) === contentHash);
     
         if (existingNote) {
-            console.log('Note with similar content already in batch, skipping');
+            console.log('Duplicate content detected, skipping');
             return;
         }
-        console.log('Adding note to batch:', note.content.substring(0, 50) + '...');
-        
-        this.processedNoteIds.add(noteId);
-
-        // Add to pending batch
+    
         this.pendingNotes.push(note);
-        
-        // Save to local storage temporarily
         this.saveNoteToLocalStorage(note);
         
-        // Process immediately if batch is getting large
+        // Process if batch is full
         if (this.pendingNotes.length >= this.maxBatchSize) {
-            console.log('Batch size limit reached, processing immediately');
             this.processBatch();
         }
         
-        console.log(`Note added to batch. Current batch size: ${this.pendingNotes.length}`);
-        
-        // Update badge to show pending notes
         this.updateBadge(this.pendingNotes.length.toString(), '#FF9800');
     }
-
-    hashContent(content) {
-        // Simple hash function to detect duplicate content
-        let hash = 0;
-        for (let i = 0; i < content.length; i++) {
-            const char = content.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
-        }
-        return hash.toString();
-    }
+    
     
 
     /**
@@ -163,8 +141,6 @@ class BatchProcessor {
                 batch_id: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 notes: this.pendingNotes,
                 timestamp: new Date().toISOString(),
-                batch_size: this.pendingNotes.length,
-                processing_mode: 'async_batch'
             };
             
             // Send to server
@@ -392,31 +368,11 @@ class BatchProcessor {
      */
     saveNoteToLocalStorage(note) {
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        note.id = noteId;
-        note.stored_at = new Date().toISOString();
-        note.sync_status = 'pending';
-        
-        chrome.storage.local.get(null, (result) => {
-            const notesToSave = { [noteId]: note };
-            
-            // Add existing notes but limit total count
-            const existingNotes = Object.keys(result)
-                .filter(key => key.startsWith('note_'))
-                .map(key => ({ ...result[key], key }))
-                .sort((a, b) => new Date(b.source?.timestamp || 0) - new Date(a.source?.timestamp || 0))
-                .slice(0, this.maxLocalNotes - 1); // Keep room for new note
-            
-            existingNotes.forEach(existingNote => {
-                notesToSave[existingNote.key] = existingNote;
-            });
-
-            chrome.storage.local.set(notesToSave, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error saving note to local storage:', chrome.runtime.lastError);
-                } else {
-                    console.log('Note saved to local storage temporarily');
-                }
-            });
+    
+        chrome.storage.local.set({ [noteId]: note }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error saving note:', chrome.runtime.lastError);
+            }
         });
     }
 
@@ -470,6 +426,22 @@ class BatchProcessor {
             console.error('Failed to get server status:', error);
             return null;
         }
+    }
+
+    hashContent(content) {
+        // Handle undefined/null content
+        if (!content || typeof content !== 'string') {
+            return '0';
+        }
+        
+        // Simple hash function to detect duplicate content
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString();
     }
 
     /**
