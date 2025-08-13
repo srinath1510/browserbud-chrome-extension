@@ -423,6 +423,17 @@ class BatchProcessor {
         }
     }
 
+    hashContent(content) {
+        // Simple hash function to detect duplicate content
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString();
+    }
+
     /**
      * Clean up old notes from local storage
      */
