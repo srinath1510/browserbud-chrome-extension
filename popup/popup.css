@@ -129,3 +129,258 @@ button svg {
     margin-left: 10px; /* Space between note content and tag */
     font-size: 0.9em; /* Slightly smaller font size */
 }
+
+.note-metadata {
+    font-size: 0.8em;
+    color: #666;
+    margin-top: 4px;
+    padding: 4px;
+    background-color: #f4f4f4;
+    border-radius: 4px;
+}
+
+.session-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.session-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #5f6368;
+}
+
+.session-notes-count {
+    font-weight: 500;
+    color: #1a73e8;
+}
+
+.session-separator {
+    color: #dadce0;
+}
+
+.session-domain {
+    color: #5f6368;
+}
+
+.batch-indicator {
+    display: flex;
+    align-items: center;
+}
+
+.batch-status {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.batch-status.synced {
+    background-color: #e8f5e8;
+    color: #137333;
+}
+
+.batch-status.pending {
+    background-color: #fef7e0;
+    color: #ea8600;
+}
+
+.batch-status.syncing {
+    background-color: #e3f2fd;
+    color: #1565c0;
+}
+
+.batch-status.offline {
+    background-color: #fce8e6;
+    color: #d93025;
+}
+
+/* Fix for bake section */
+.bake-section {
+    margin-bottom: 16px;
+}
+
+.bake-btn {
+    width: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.bake-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.bake-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.bake-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.bake-subtitle {
+    font-size: 11px;
+    opacity: 0.9;
+    margin-top: 2px;
+}
+
+/* Fix for saved notes section */
+#notesContainer {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+#notesContainer h2 {
+    font-size: 14px;
+    font-weight: 500;
+    color: #202124;
+    margin-bottom: 8px;
+}
+
+.scrollable-notes {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #e8eaed;
+    border-radius: 6px;
+    background-color: #ffffff;
+}
+
+#notesList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+#notesList li {
+    padding: 12px;
+    border-bottom: 1px solid #f1f3f4;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+#notesList li:last-child {
+    border-bottom: none;
+}
+
+#notesList li:hover {
+    background-color: #f8f9fa;
+}
+
+.note-content {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #202124;
+    margin-bottom: 6px;
+}
+
+.note-type {
+    display: inline-block;
+    background-color: #e8f0fe;
+    color: #1a73e8;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.note-metadata {
+    font-size: 11px;
+    color: #5f6368;
+    line-height: 1.3;
+}
+
+.note-metadata strong {
+    font-weight: 500;
+}
+
+/* Empty state styling */
+.empty-state {
+    padding: 24px;
+    text-align: center;
+    color: #5f6368;
+    font-size: 12px;
+    line-height: 1.4;
+    font-style: italic;
+}
+
+/* Fix for bake status */
+.bake-status {
+    background-color: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.status-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.status-icon {
+    font-size: 20px;
+}
+
+.status-text {
+    flex: 1;
+}
+
+.status-title {
+    font-weight: 500;
+    color: #202124;
+    font-size: 13px;
+}
+
+.status-subtitle {
+    color: #5f6368;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-height: 500px) {
+    .scrollable-notes {
+        max-height: 150px;
+    }
+}
+
+@media (max-height: 400px) {
+    .bake-section {
+        margin-bottom: 8px;
+    }
+    
+    .notes-container {
+        margin-bottom: 8px;
+    }
+    
+    #notesArea {
+        height: 100px;
+    }
+}

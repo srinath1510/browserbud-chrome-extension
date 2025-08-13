@@ -19,6 +19,46 @@
                         <path d="M8 12l-4-4h2.5V3h3v5H12L8 12zm-6 2h12v1H2z"/>
                     </svg>
                 </button>
+                <button id="syncBtn" title="Sync pending notes" style="display: none;">
+                    <svg width="16" height="16" viewBox="0 0 16 16">
+                        <path d="M13.5 2L10 5.5L11.5 7L16 2.5L11.5 -2L10 -0.5L13.5 2Z M2.5 14L6 10.5L4.5 9L0 13.5L4.5 18L6 16.5L2.5 14Z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="session-status" id="sessionStatus">
+            <div class="session-info">
+                <span class="session-notes-count" id="sessionNotesCount">0 notes captured</span>
+                <span class="session-separator">•</span>
+                <span class="session-domain" id="sessionDomain">Ready to capture</span>
+            </div>
+            <div class="batch-indicator" id="batchIndicator">
+                <span class="batch-status" id="batchStatus">Synced</span>
+            </div>
+        </div>
+
+        <div class="bake-section" id="bakeSection">
+            <button id="bakeBtn" class="bake-btn" title="Process your knowledge through AI pipeline">
+                <div class="bake-content">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span class="bake-text">Bake Notes</span>
+                </div>
+                <div class="bake-subtitle">Transform into knowledge</div>
+            </button>
+        </div>
+
+        <div class="bake-status" id="bakeStatus" style="display: none;">
+            <div class="status-content">
+                <div class="status-icon">⏳</div>
+                <div class="status-text">
+                    <div class="status-title">Baking in progress...</div>
+                    <div class="status-subtitle">Processing your notes through AI pipeline</div>
+                </div>
             </div>
         </div>
         
@@ -33,6 +73,13 @@
                 <ul id="notesList"></ul>
             </div>
         </div>
+
+        <div class="processing-results" id="processingResults" style="display: none;">
+            <h3>Last Bake Results</h3>
+            <div class="results-content" id="resultsContent">
+            </div>
+        </div>
+
 
         <div class="footer">
             <div class="status" id="status"></div>
