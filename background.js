@@ -67,13 +67,22 @@ const onClicked = async (info, tab) => {
         return;
     }
 
-    const note = createNoteFromSelection(info, tab);
-    console.log('Saving Note for Batch Processing:', note);
-    
-    if (batchProcessor) {
-        batchProcessor.addNote(note);
-    } else {
-        console.error('Batch processor not initialized');
+    try { 
+        const note = await createNoteFromSelection(info, tab);
+        console.log('Saving Note for Batch Processing:', note);
+        
+        if (batchProcessor) {
+            batchProcessor.addNote(note);
+        } else {
+            console.error('Batch processor not initialized');
+        }
+    } catch (error) {
+        console.error('Error creating note:', error);
+
+        const fallbackNote = await createFallbackNote(info, tab);
+        if (batchProcessor) {
+            batchProcessor.addNote(fallbackNote);
+        }
     }
 };
 
