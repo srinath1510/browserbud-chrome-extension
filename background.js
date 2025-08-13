@@ -59,7 +59,7 @@ const extractPageMetadata = (tab) => {
 /**
  * Handle context menu click
  */
-const onClicked = (info, tab) => {
+const onClicked = async (info, tab) => {
     console.log('Context menu item clicked:', info);
     
     if (!info.selectionText) {
@@ -80,10 +80,11 @@ const onClicked = (info, tab) => {
 /**
  * Create a note object from selection and metadata
  */
-function createNoteFromSelection(info, tab) {
+async function createNoteFromSelection(info, tab) {
+    const userId = await getUserId();
     return {
         content: info.selectionText,
-        user_id: "browser_user",
+        user_id: userId,
         source_url: tab.url,
         title: tab.title,
         timestamp: new Date().toISOString(),
