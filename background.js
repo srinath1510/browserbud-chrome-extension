@@ -264,75 +264,12 @@ const onClicked = (info, tab) => {
 function createNoteFromSelection(info, tab, pageMetadata) {
     return {
         content: info.selectionText,
-        type: 'selection',
-        source: {
-            url: tab.url,
-            title: tab.title,
-            timestamp: new Date().toISOString()
-        },
-        metadata: {
-            // Core identification
-            capture_id: pageMetadata.capture_id || `capture_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-            timestamp: pageMetadata.timestamp || new Date().toISOString(),
-            timezone: pageMetadata.timezone || 'unknown',
-            annotationTimestamp: new Date().toISOString(),
-            
-            // Page context
-            url: pageMetadata.url || tab.url,
-            title: pageMetadata.title || tab.title,
-            pageTitle: pageMetadata.title || tab.title,
-            domain: pageMetadata.domain || new URL(tab.url).hostname,
-            language: pageMetadata.language || 'unknown',
-            contentType: pageMetadata.contentType || 'text/html',
-            
-            // Selection details
-            selected_text: pageMetadata.selected_text || info.selectionText,
-            wordCount: pageMetadata.wordCount || info.selectionText.trim().split(/\s+/).filter(word => word.length > 0).length,
-            selection_length: pageMetadata.selection_length || info.selectionText.length,
-            selectionLength: info.selectionText.length,
-            context_before: pageMetadata.context_before || '',
-            context_after: pageMetadata.context_after || '',
-            selection_start_offset: pageMetadata.selection_start_offset || 0,
-            selection_end_offset: pageMetadata.selection_end_offset || 0,
-            relative_position: pageMetadata.relative_position || 0,
-            
-            // Page structure
-            full_page_word_count: pageMetadata.full_page_word_count || 0,
-            heading_hierarchy: pageMetadata.heading_hierarchy || [],
-            linkCount: pageMetadata.linkCount || 0,
-            list_items_count: pageMetadata.list_items_count || 0,
-            table_count: pageMetadata.table_count || 0,
-            image_count: pageMetadata.image_count || 0,
-            video_count: pageMetadata.video_count || 0,
-            
-            // Content type indicators
-            has_code: pageMetadata.has_code || false,
-            has_math: pageMetadata.has_math || false,
-            has_data_tables: pageMetadata.has_data_tables || false,
-            external_links: pageMetadata.external_links || 0,
-            internal_links: pageMetadata.internal_links || 0,
-            citations: pageMetadata.citations || 0,
-            
-            // User behavior
-            time_on_page: pageMetadata.time_on_page || 0,
-            scroll_depth_at_selection: pageMetadata.scroll_depth_at_selection || 0,
-            viewport_size: pageMetadata.viewport_size || 'unknown',
-            
-            // Classification
-            content_category: pageMetadata.content_category || 'general',
-            knowledge_level: pageMetadata.knowledge_level || 'unknown',
-            primary_domain: pageMetadata.primary_domain || '',
-            
-            // Technical
-            browser: pageMetadata.browser || navigator.userAgent,
-            capture_trigger: pageMetadata.capture_trigger || 'context_menu',
-            intent: 'contextMenuCapture',
-
-            // Batch processing
-            batch_pending: true,
-            local_id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        },
-        tag: 'Context Menu'
+        user_id: "browser_user",
+        source_url: tab.url,
+        title: tab.title,
+        timestamp: new Date().toISOString(),
+        intent: "learn", // default, could be determined from context
+        user_note: ""
     };
 }
 
@@ -342,24 +279,12 @@ function createNoteFromSelection(info, tab, pageMetadata) {
 function createFallbackNote(info, tab) {
     return {
         content: info.selectionText,
-        type: 'selection',
-        source: {
-            url: tab.url,
-            title: tab.title,
-            timestamp: new Date().toISOString()
-        },
-        tag: 'Context Menu',
-        metadata: {
-            error: 'Metadata extraction failed',
-            annotationTimestamp: new Date().toISOString(),
-            selectionLength: info.selectionText.length,
-            intent: 'contextMenuCapture',
-            wordCount: info.selectionText.trim().split(/\s+/).filter(word => word.length > 0).length,
-            pageTitle: tab.title,
-            domain: new URL(tab.url).hostname,
-            batch_pending: true,
-            local_id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-        }
+        user_id: "browser_user",
+        source_url: tab.url,
+        title: tab.title,
+        timestamp: new Date().toISOString(),
+        intent: "learn",
+        user_note: ""
     };
 }
 
