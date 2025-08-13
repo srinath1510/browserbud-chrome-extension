@@ -369,7 +369,7 @@ function debugCurrentState() {
 
 async function saveNotes() {
     try {
-        const notes = notesArea.value.trim();
+        const notes = elements.notesArea.value.trim();
         if (!notes) {
             updateStatus('No notes to save.');
             return;
