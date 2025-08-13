@@ -163,8 +163,6 @@ class BatchProcessor {
                 batch_id: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 notes: this.pendingNotes,
                 timestamp: new Date().toISOString(),
-                batch_size: this.pendingNotes.length,
-                processing_mode: 'async_batch'
             };
             
             // Send to server
@@ -392,31 +390,11 @@ class BatchProcessor {
      */
     saveNoteToLocalStorage(note) {
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        note.id = noteId;
-        note.stored_at = new Date().toISOString();
-        note.sync_status = 'pending';
-        
-        chrome.storage.local.get(null, (result) => {
-            const notesToSave = { [noteId]: note };
-            
-            // Add existing notes but limit total count
-            const existingNotes = Object.keys(result)
-                .filter(key => key.startsWith('note_'))
-                .map(key => ({ ...result[key], key }))
-                .sort((a, b) => new Date(b.source?.timestamp || 0) - new Date(a.source?.timestamp || 0))
-                .slice(0, this.maxLocalNotes - 1); // Keep room for new note
-            
-            existingNotes.forEach(existingNote => {
-                notesToSave[existingNote.key] = existingNote;
-            });
-
-            chrome.storage.local.set(notesToSave, () => {
-                if (chrome.runtime.lastError) {
-                    console.error('Error saving note to local storage:', chrome.runtime.lastError);
-                } else {
-                    console.log('Note saved to local storage temporarily');
-                }
-            });
+    
+        chrome.storage.local.set({ [noteId]: note }, () => {
+            if (chrome.runtime.lastError) {
+                console.error('Error saving note:', chrome.runtime.lastError);
+            }
         });
     }
 
