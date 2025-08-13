@@ -85,56 +85,29 @@ class BatchProcessor {
      * @param {Object} note - The note to add
      */
     addNote(note) {
-        // Generate or get note ID
-        const noteId = note.id || note.metadata?.local_id || `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         note.id = noteId;
     
-        // Check for duplicates
-        if (this.processedNoteIds.has(noteId)) {
-            console.log(`Duplicate note detected, skipping: ${noteId}`);
-            return;
-        }
-    
-        // Check if note with same content already exists
+        // Simple content hash for duplicates
         const contentHash = this.hashContent(note.content);
         const existingNote = this.pendingNotes.find(n => this.hashContent(n.content) === contentHash);
     
         if (existingNote) {
-            console.log('Note with similar content already in batch, skipping');
+            console.log('Duplicate content detected, skipping');
             return;
         }
-        console.log('Adding note to batch:', note.content.substring(0, 50) + '...');
-        
-        this.processedNoteIds.add(noteId);
-
-        // Add to pending batch
+    
         this.pendingNotes.push(note);
-        
-        // Save to local storage temporarily
         this.saveNoteToLocalStorage(note);
         
-        // Process immediately if batch is getting large
+        // Process if batch is full
         if (this.pendingNotes.length >= this.maxBatchSize) {
-            console.log('Batch size limit reached, processing immediately');
             this.processBatch();
         }
         
-        console.log(`Note added to batch. Current batch size: ${this.pendingNotes.length}`);
-        
-        // Update badge to show pending notes
         this.updateBadge(this.pendingNotes.length.toString(), '#FF9800');
     }
-
-    hashContent(content) {
-        // Simple hash function to detect duplicate content
-        let hash = 0;
-        for (let i = 0; i < content.length; i++) {
-            const char = content.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32-bit integer
-        }
-        return hash.toString();
-    }
+    
     
 
     /**
