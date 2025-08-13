@@ -6,6 +6,21 @@ const API_BASE_URL = 'http://localhost:8000/api';
 
 let batchProcessor = null;
 
+// Get consistent user ID
+function getUserId() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['user_id'], (result) => {
+            if (result.user_id) {
+                resolve(result.user_id);
+            } else {
+                const newUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                chrome.storage.local.set({ user_id: newUserId });
+                resolve(newUserId);
+            }
+        });
+    });
+}
+
 /**
  * Handle extension installation
  */
@@ -32,191 +47,12 @@ const onStartup = () => {
 
 
 const extractPageMetadata = (tab) => {
-    return new Promise((resolve, reject) => {
-        try {
-            chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => {
-                    const getContextText = (direction, charLimit) => {
-                        try {
-                            const selection = window.getSelection();
-                            if (selection.rangeCount === 0) return '';
-                            
-                            const range = selection.getRangeAt(0);
-                            
-                            const selectedText = selection.toString();
-                            const bodyText = document.body.innerText || document.body.textContent || '';
-                            const selectionIndex = bodyText.indexOf(selectedText);
-                            
-                            if (selectionIndex === -1) return '';
-                            
-                            if (direction === 'before') {
-                                const start = Math.max(0, selectionIndex - charLimit);
-                                return bodyText.slice(start, selectionIndex);
-                            } else {
-                                const end = Math.min(bodyText.length, selectionIndex + selectedText.length + charLimit);
-                                return bodyText.slice(selectionIndex + selectedText.length, end);
-                            }
-                        } catch (error) {
-                            console.error('Error getting context text:', error);
-                            return '';
-                        }
-                    };
-
-                    const getSelectionPosition = () => {
-                        try {
-                            const selection = window.getSelection();
-                            if (selection.rangeCount === 0) return { start: 0, end: 0 };
-                        
-                            const selectedText = selection.toString();
-                            const bodyText = document.body.innerText || document.body.textContent || '';
-                            const start = bodyText.indexOf(selectedText);
-                            
-                            if (start === -1) return { start: 0, end: 0 };
-                            
-                            return { start, end };
-                        } catch (error) {
-                            console.error('Error getting selection position:', error);
-                            return { start: 0, end: 0 };
-                        }
-                    };
-
-                    const getRelativePagePosition = () => {
-                        const selection = window.getSelection();
-                        if (selection.rangeCount === 0) return 0;
-                        
-                        try {
-                            const range = selection.getRangeAt(0);
-                            const rect = range.getBoundingClientRect();
-                            const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
-                            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-                            const selectionTop = currentScroll + rect.top;
-                        
-                            return Math.min(1, Math.max(0, selectionTop / documentHeight));
-                        } catch (error) {
-                            console.error('Error getting relative page position:', error);
-                            return 0;
-                        }
-                    };
-
-                    const extractHeadingHierarchy = () => {
-                        const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
-                        return Array.from(headings).map(h => ({
-                            level: parseInt(h.tagName.charAt(1)),
-                            text: h.textContent.trim().substring(0, 100),
-                            id: h.id || null
-                        }));
-                    };
-
-                    const classifyContentCategory = () => {
-                        const title = document.title.toLowerCase();
-                        const content = document.body.textContent.toLowerCase();
-                        
-                        // Simple classification based on keywords
-                        if (title.includes('tutorial') || content.includes('step by step')) return 'tutorial';
-                        if (title.includes('documentation') || title.includes('docs')) return 'documentation';
-                        if (title.includes('research') || title.includes('study')) return 'research';
-                        if (title.includes('news') || title.includes('breaking')) return 'news';
-                        if (document.querySelector('pre, code')) return 'technical';
-                        
-                        return 'general';
-                    };
-
-                    const estimateKnowledgeLevel = () => {
-                        const content = document.body.textContent;
-                        const technicalTerms = (content.match(/\b(algorithm|implementation|architecture|optimization|configuration|framework|library|database|server|client|API|protocol|encryption|authentication|authorization)\b/gi) || []).length;
-                        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-                        const avgSentenceLength = sentences.length > 0 ? content.length / sentences.length : 0;
-                        
-                        if (technicalTerms > 10 && avgSentenceLength > 100) return 'advanced';
-                        if (technicalTerms > 3 || avgSentenceLength > 80) return 'intermediate';
-                        return 'beginner';
-                    };
-
-                    // Extract comprehensive metadata
-                    const selectedText = window.getSelection().toString();
-                    const selectionPosition = getSelectionPosition();
-                    const bodyText = document.body.innerText || document.body.textContent || '';
-                    const pageWordCount = bodyText.trim().split(/\s+/).filter(word => word.length > 0).length;
-
-                    
-                    const metadata = {
-                        // ==================== CORE IDENTIFICATION ====================
-                        capture_id: `capture_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                        timestamp: new Date().toISOString(),
-                        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                        
-                        // ==================== ENHANCED PAGE METADATA ====================
-                        url: window.location.href,
-                        title: document.title,
-                        domain: window.location.hostname,
-                        language: document.documentElement.lang || navigator.language,
-                        contentType: document.contentType || 'text/html',
-
-                        // ==================== CONTENT ANALYSIS ====================
-                        // Selection Details
-                        selected_text: selectedText,
-                        wordCount: selectedText.trim().split(/\s+/).filter(word => word.length > 0).length,
-                        selection_length: selectedText.length,
-                        
-                        // Context
-                        context_before: getContextText('before', 100),
-                        context_after: getContextText('after', 100),
-                        
-                        // Position
-                        selection_start_offset: selectionPosition.start,
-                        selection_end_offset: selectionPosition.end,
-                        relative_position: getRelativePagePosition(),
-                        
-                        // Page Structure
-                        full_page_word_count: pageWordCount,
-                        heading_hierarchy: extractHeadingHierarchy(),
-                        linkCount: document.querySelectorAll('a').length,
-                        list_items_count: document.querySelectorAll('li').length,
-                        table_count: document.querySelectorAll('table').length,
-                        image_count: document.querySelectorAll('img').length,
-                        video_count: document.querySelectorAll('video').length,
-                        
-                        // Content Type Indicators
-                        has_code: document.querySelector('pre, code, .highlight, .hljs') !== null,
-                        has_math: document.querySelector('math, .math, .katex, .MathJax') !== null,
-                        has_data_tables: document.querySelectorAll('table[data-*], .data-table').length > 0,
-                        
-                        // Links
-                        external_links: document.querySelectorAll('a[href^="http"]').length,
-                        internal_links: document.querySelectorAll('a[href^="/"], a[href^="#"]').length,
-                        citations: document.querySelectorAll('[class*="citation"], [class*="reference"], sup').length,
-
-                        // ==================== USER BEHAVIOR ====================
-                        time_on_page: performance.timing ? (Date.now() - performance.timing.loadEventStart) : 0,
-                        scroll_depth_at_selection: Math.round((window.pageYOffset / Math.max(document.body.scrollHeight - window.innerHeight, 1)) * 100),
-                        viewport_size: `${window.innerWidth}x${window.innerHeight}`,
-
-                        // ==================== CONTENT CLASSIFICATION ====================
-                        content_category: classifyContentCategory(),
-                        knowledge_level: estimateKnowledgeLevel(),
-                        primary_domain: window.location.hostname.split('.').slice(-2).join('.'), // rough domain classification
-
-                        // ==================== TECHNICAL METADATA ====================
-                        browser: navigator.userAgent,
-                        capture_trigger: 'context_menu'
-                    };
-
-                    console.log('Enhanced Metadata Extracted:', metadata);
-                    return metadata;
-                }
-            }, (result) => {
-                if (chrome.runtime.lastError) {
-                    reject(chrome.runtime.lastError);
-                } else {
-                    const enhancedMetadata = result && result.length > 0 && result[0].result ? result[0].result : {};
-                    resolve(enhancedMetadata);
-                }
-            });
-        } catch (error) {
-            console.error('Error in extractPageMetadata:', error);
-            reject(error);
-        }
+    return new Promise((resolve) => {
+        resolve({
+            url: tab.url,
+            title: tab.title,
+            timestamp: new Date().toISOString()
+        });
     });
 };
 
@@ -231,44 +67,27 @@ const onClicked = (info, tab) => {
         return;
     }
 
-    extractPageMetadata(tab)
-    .then(pageMetadata => {
-        const note = createNoteFromSelection(info, tab, pageMetadata);
-        console.log('Saving Note for Batch Processing:', note);
-            
-        
-        // Add to batch processor
-        if (batchProcessor) {
-            batchProcessor.addNote(note);
-        } else {
-            console.error('Batch processor not initialized');
-        }
-    })
-    .catch(error => {
-        console.error('Error extracting page metadata:', error);
-        
-        // Create fallback note
-        const fallbackNote = createFallbackNote(info, tab);
-        
-        if (batchProcessor) {
-            batchProcessor.addNote(fallbackNote);
-        } else {
-            console.error('Batch processor not initialized');
-        }
-    });
+    const note = createNoteFromSelection(info, tab);
+    console.log('Saving Note for Batch Processing:', note);
+    
+    if (batchProcessor) {
+        batchProcessor.addNote(note);
+    } else {
+        console.error('Batch processor not initialized');
+    }
 };
 
 /**
  * Create a note object from selection and metadata
  */
-function createNoteFromSelection(info, tab, pageMetadata) {
+function createNoteFromSelection(info, tab) {
     return {
         content: info.selectionText,
         user_id: "browser_user",
         source_url: tab.url,
         title: tab.title,
         timestamp: new Date().toISOString(),
-        intent: "learn", // default, could be determined from context
+        intent: "learn",
         user_note: ""
     };
 }
@@ -276,10 +95,11 @@ function createNoteFromSelection(info, tab, pageMetadata) {
 /**
  * Create a fallback note when metadata extraction fails
  */
-function createFallbackNote(info, tab) {
+async function createFallbackNote(info, tab) {
+    const userId = await getUserId();
     return {
         content: info.selectionText,
-        user_id: "browser_user",
+        user_id: userId,
         source_url: tab.url,
         title: tab.title,
         timestamp: new Date().toISOString(),
