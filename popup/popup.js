@@ -384,24 +384,13 @@ async function saveNotes() {
         }
 
         const note = {
-            id: `note_${Date.now()}`,
             content: notes,
-            type: 'manual',
-            source: {
-                url: '',
-                title: '',
-                timestamp: new Date().toISOString()
-            },
-            metadata: {
-                wordCount: notes.trim().split(/\s+/).length,
-                annotationTimestamp: new Date().toISOString(),
-                pageTitle: 'Manual Entry',
-                domain: 'extension',
-                capture_trigger: 'manual_entry',
-                batch_pending: true,
-                local_id: `manual_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`                
-            },
-            tag: 'Manual Entry'
+            user_id: "browser_user",
+            source_url: "",
+            title: "Manual Entry",
+            timestamp: new Date().toISOString(),
+            intent: "reference",
+            user_note: ""
         };
 
         // Send to background script for processing
