@@ -538,15 +538,11 @@ async function downloadNotes() {
         if (currentSessionData.notes.length > 0) {
             content += '=== Saved Notes ===\n';
             currentSessionData.notes.forEach((note, index) => {
-                content += `\n--- Note ${index + 1} (${note.tag || 'Unknown'}) ---\n`;
+                content += `\n--- Note ${index + 1} (${note.intent || 'learn'}) ---\n`;
                 content += `${note.content}\n`;
-                if (note.metadata?.pageTitle) {
-                    content += `Source: ${note.metadata.pageTitle}\n`;
-                }
-                if (note.source?.url) {
-                    content += `URL: ${note.source.url}\n`;
-                }
-                content += `Date: ${new Date(note.source?.timestamp || 0).toLocaleString()}\n`;
+                content += `Source: ${note.title || 'Unknown'}\n`;
+                content += `URL: ${note.source_url || 'Unknown'}\n`;
+                content += `Date: ${new Date(note.timestamp || 0).toLocaleString()}\n`;
             });
         }
         
