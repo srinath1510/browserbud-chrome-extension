@@ -85,6 +85,11 @@ class BatchProcessor {
      * @param {Object} note - The note to add
      */
     addNote(note) {
+        // Validate note has required content
+        if (!note || !note.content || typeof note.content !== 'string') {
+            console.error('Invalid note - missing content:', note);
+            return;
+        }
         const noteId = `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         note.id = noteId;
     
@@ -424,6 +429,11 @@ class BatchProcessor {
     }
 
     hashContent(content) {
+        // Handle undefined/null content
+        if (!content || typeof content !== 'string') {
+            return '0';
+        }
+        
         // Simple hash function to detect duplicate content
         let hash = 0;
         for (let i = 0; i < content.length; i++) {
