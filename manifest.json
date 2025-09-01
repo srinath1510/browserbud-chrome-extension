@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Smart Notes",
+  "name": "BrowserBud",
   "version": "1.0.0",
   "description": "Intelligent note-taking with AI-powered knowledge processing",
 
@@ -27,7 +27,7 @@
 
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Smart Notes"
+    "default_title": "BrowserBud"
   },
 
   "web_accessible_resources": [
