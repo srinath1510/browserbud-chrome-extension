@@ -66,8 +66,8 @@ describe('Background Script Functionality', () => {
     test('should create context menu on install', () => {
         background.onInstalled();
         expect(chrome.contextMenus.create).toHaveBeenCalledWith({
-            id: "smartNotes",
-            title: "Smart Notes",
+            id: "browserBud",
+            title: "BrowserBud",
             contexts: ["selection"],
         });
     });

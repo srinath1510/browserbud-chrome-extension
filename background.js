@@ -27,8 +27,8 @@ function getUserId() {
 const onInstalled = () => {
     console.log('Context menu created');
     chrome.contextMenus.create({
-        id: "smartNotes",
-        title: "Smart Notes",
+        id: "browserBud",
+        title: "BrowserBud",
         contexts: ["selection"]
     });
 
@@ -41,7 +41,7 @@ const onInstalled = () => {
  * Handle extension startup (browser restart)
  */
 const onStartup = () => {
-    console.log('Smart Notes extension startup');
+    console.log('BrowserBud extension startup');
     initializeBatchProcessor();
 };
 

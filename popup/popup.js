@@ -39,7 +39,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
  * Initialize popup functionality
  */
 function initializePopup() {
-    console.log('Initializing Smart Notes popup...');
+    console.log('Initializing BrowserBud popup...');
 
     elements = {
         notesArea: document.getElementById('notesArea'),
@@ -67,7 +67,7 @@ function initializePopup() {
     loadInitialData();
     updateCharCount();
 
-    console.log('Smart Notes popup initialized successfully');
+    console.log('BrowserBud popup initialized successfully');
 }
 
 /**
@@ -556,7 +556,7 @@ async function downloadNotes() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `smart-notes-${new Date().toISOString().split('T')[0]}.txt`;
+        a.download = `browserbud-${new Date().toISOString().split('T')[0]}.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -713,7 +713,7 @@ function displayNotes(notes) {
         console.log('No notes to display');
         const emptyMessage = document.createElement('li');
         emptyMessage.className = 'empty-state';
-        emptyMessage.textContent = 'No notes captured yet. Select text on any webpage and right-click "Smart Notes"';
+        emptyMessage.textContent = 'No notes captured yet. Select text on any webpage and right-click "BrowserBud"';
         elements.notesList.appendChild(emptyMessage);
         return;
     }
