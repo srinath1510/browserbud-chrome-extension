@@ -1,7 +1,7 @@
 {
-  "name": "smart-notes-extension",
+  "name": "browserbud-chrome-extension",
   "version": "1.0.0",
-  "description": "A Chrome extension for taking smart notes",
+  "description": "A Chrome extension for intelligent note-taking with AI-powered knowledge processing",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch"
