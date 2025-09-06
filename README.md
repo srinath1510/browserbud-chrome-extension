@@ -1,6 +1,6 @@
 # BrowserBud Chrome Extension
 
-An intelligent Chrome extension that enables seamless note-taking and knowledge processing while browsing the web. BrowserBud automatically captures selected text, processes it through an AI pipeline, and transforms your collected information into structured knowledge. **Process captured notes with BrowserBud AI pipeline: https://github.com/srinath1510/BrowserBud**
+An intelligent Chrome extension that enables seamless note-taking and knowledge processing while browsing the web. BrowserBud captures selected text, processes it through an AI pipeline, and transforms your collected information into structured knowledge. **Process captured notes with BrowserBud AI pipeline: https://github.com/srinath1510/BrowserBud**
 
 ## Features
 
